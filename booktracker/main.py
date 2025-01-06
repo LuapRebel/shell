@@ -34,7 +34,7 @@ class Book:
 
 def read_books(path: Path = Path("booktracker/book_db.csv")) -> list[dict]:
     if path.is_file():
-        with open(path) as f:
+        with open(path, "r") as f:
             reader = csv.DictReader(f)
             return [row for row in reader]
     return []
