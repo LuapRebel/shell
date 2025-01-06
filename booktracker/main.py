@@ -65,24 +65,41 @@ def filter_books(field: str | None = None, value: str | None = None) -> list[dic
     return books
 
 
-def edit_book(id: str) -> None:
+def get_book_by_id(id: str) -> dict:
     book = filter_books(field="id", value=id)
     if book:
-        editbook = book[0]
-        for k, v in editbook.items():
-            data = input(f"Edit {k} ({v}): ")
-            if data:
-                editbook[k] = data
-            else:
-                editbook[k] = v
-        books = [b for b in read_books() if b["id"] != id]
-        books.append(editbook)
-        with open(DB_PATH, "w", newline="") as f:
-            dict_writer = csv.DictWriter(f, fieldnames=list(Book.__annotations__))
-            dict_writer.writeheader()
-            dict_writer.writerows(books)
+        return book[0]
     else:
         print(f"There is no book with {id=}")
+
+
+def write_books(books: list[dict]) -> None:
+    with open(DB_PATH, "w", newline="") as f:
+        dict_writer = csv.DictWriter(f, fieldnames=list(Book.__annotations__))
+        dict_writer.writeheader()
+        dict_writer.writerows(books)
+
+
+def edit_book(id: str) -> None:
+    book = get_book_by_id(id)
+    if book:
+        for k, v in book.items():
+            data = input(f"Edit {k} ({v}): ")
+            if data:
+                book[k] = data
+            else:
+                book[k] = v
+        books = [b for b in read_books() if b["id"] != id]
+        books.append(book)
+        write_books(books)
+
+
+def delete_book(id: str) -> None:
+    book = get_book_by_id(id)
+    if book:
+        books = [b for b in read_books() if b["id"] != id]
+        write_books(books)
+        print(f"Deleted {book['title']} by {book['author']}")
 
 
 parser = argparse.ArgumentParser(
@@ -126,6 +143,10 @@ read_parser.add_argument("-v", "--value", type=str)
 edit_parser = subparsers.add_parser("edit", help="Edit a book using its ID")
 edit_parser.add_argument("id", type=str)
 
+# DELETE BOOK
+delete_parser = subparsers.add_parser("delete", help="Delete a book using its ID")
+delete_parser.add_argument("id", type=str)
+
 args = parser.parse_args()
 
 if args.command == "add":
@@ -141,3 +162,6 @@ elif args.command == "read":
 elif args.command == "edit":
     if args.id:
         edit_book(args.id)
+elif args.command == "delete":
+    if args.id:
+        delete_book(args.id)
