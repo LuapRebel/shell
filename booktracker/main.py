@@ -32,13 +32,19 @@ class Book:
             self.id = 1
 
 
-def read_books(path: Path = Path("booktracker/book_db.csv")) -> list[str]:
+def read_books(path: Path = Path("booktracker/book_db.csv")) -> list[dict]:
     if path.is_file():
         with open(path) as f:
             reader = csv.DictReader(f)
             return [row for row in reader]
-    else:
-        return []
+    return []
+
+
+def filter_books(field: str | None = None, value: str | None = None) -> list[dict]:
+    books = read_books()
+    if field and value:
+        return [b for b in books if value in str(b[field])]
+    return books
 
 
 def write_book(book: Book) -> None:
@@ -89,6 +95,11 @@ add_parser.add_argument(
     help="DDDD-MM-YY",
 )
 
+# READ BOOKS
+read_parser = subparsers.add_parser("read", help="View existing books")
+read_parser.add_argument("-f", "--field", type=str)
+read_parser.add_argument("-v", "--value", type=str)
+
 args = parser.parse_args()
 
 if args.command == "add":
@@ -96,3 +107,8 @@ if args.command == "add":
         args.title, args.author, args.status, args.date_started, args.date_completed
     )
     write_book(new_book)
+elif args.command == "read":
+    if args.field and args.value:
+        print(filter_books(args.field, args.value))
+    else:
+        print(filter_books())
