@@ -4,6 +4,7 @@ from enum import StrEnum
 import sqlite3
 
 import click
+from rich import print
 
 
 DB_PATH = "bookdb/books.db"
@@ -87,7 +88,7 @@ def add(
     cursor = CONN.cursor()
     cursor.execute(add_sql, tuple(asdict(book).values()))
     CONN.commit()
-    click.echo(f"Added {book} to database")
+    print(f"Added {book} to database")
 
 
 # READ BOOKS
@@ -106,14 +107,14 @@ def read(field: str | None = None, value: str | None = None) -> list[dict]:
         books = cursor.execute(read_sql, (str("%" + value + "%"),)).fetchall()
         if books:
             for book in books:
-                click.echo(dict(book))
+                print(dict(book))
         else:
-            click.echo(f"There are no books with {field} containing {value}.")
+            print(f"There are no books with {field} containing {value}.")
     else:
         cursor = CONN.cursor()
         books = cursor.execute("SELECT * FROM books").fetchall()
         for book in books:
-            click.echo(dict(book))
+            print(dict(book))
     return books
 
 
@@ -142,13 +143,13 @@ def edit(id: str) -> None:
             cursor.execute(full_sql, update_values)
             CONN.commit()
     else:
-        click.echo(f"There is no book with {id=}")
+        print(f"There is no book with {id=}")
 
 
 @click.command()
 @click.argument("id")
 def delete(id: str) -> None:
-    click.echo(f"Attempting to delete book with {id=}")
+    print(f"Attempting to delete book with {id=}")
     ctx = click.Context(read)
     books = ctx.forward(read, field="id", value=id)
     if books:
@@ -162,7 +163,7 @@ def delete(id: str) -> None:
             cursor.execute(delete_sql)
             CONN.commit()
     else:
-        click.echo(f"There is no book with {id=}")
+        print(f"There is no book with {id=}")
 
 
 if __name__ == "__main__":
