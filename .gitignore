@@ -9,5 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-# Sandbox
+# local
 sandbox/
+booktracker/book_db.csv

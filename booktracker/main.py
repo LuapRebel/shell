@@ -1,7 +1,9 @@
 import argparse
+import csv
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
+from pathlib import Path
 
 from rich import print
 
@@ -19,6 +21,21 @@ class Book:
     status: Status = "TBR"
     date_started: date | None = None
     date_completed: date | None = None
+
+
+def write_book(book: Book) -> None:
+    path = Path("booktracker/book_db.csv")
+    if path.is_file():
+        with open(path, "a", newline="\n") as f:
+            writer = csv.writer(f)
+            writer.writerow(book.__dict__.values())
+    else:
+        with open(path, "w", newline="\n") as f:
+            fieldnames = list(Book.__annotations__)
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(book.__dict__)
+    print(f"Added {book.title} by {book.author} to book_db.csv")
 
 
 parser = argparse.ArgumentParser(
@@ -56,7 +73,7 @@ add_parser.add_argument(
 args = parser.parse_args()
 
 if args.command == "add":
-    test_book = Book(
+    new_book = Book(
         args.title, args.author, args.status, args.date_started, args.date_completed
     )
-    print(test_book)
+    write_book(new_book)
