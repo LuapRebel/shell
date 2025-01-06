@@ -8,6 +8,7 @@ import click
 
 DB_PATH = "bookdb/books.db"
 CONN = sqlite3.connect(DB_PATH)
+CONN.row_factory = sqlite3.Row
 
 CONN.execute(
     """
@@ -55,8 +56,20 @@ def cli() -> None:
 @click.option("-t", "--title", default="")
 @click.option("-a", "--author", default="", help="LASTNAME, FIRSTNAME")
 @click.option("-s", "--status", type=click.Choice(Status._member_names_), default="TBR")
-@click.option("-d", "--date-started", default=None, help="YYYY-MM-DD")
-@click.option("-c", "--date-completed", default=None, help="YYYY-MM-DD")
+@click.option(
+    "-d",
+    "--date-started",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="YYYY-MM-DD",
+)
+@click.option(
+    "-c",
+    "--date-completed",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="YYYY-MM-DD",
+)
 def add(
     title: str, author: str, status: Status, date_started: date, date_completed: date
 ):
@@ -75,29 +88,65 @@ def add(
     cursor.execute(add_sql, tuple(asdict(book).values()))
     CONN.commit()
     click.echo(f"Added {book} to database")
-    CONN.close()
 
 
 # READ BOOKS
 @click.command()
-@click.option("-f", "--field", help="Field to search within")
+@click.option(
+    "-f",
+    "--field",
+    type=click.Choice(Book.__annotations__),
+    help="Field to search within",
+)
 @click.option("-v", "--value", help="Value to search for")
-def read(field: str | None = None, value: str | None = None) -> None:
+def read(field: str | None = None, value: str | None = None) -> list[dict]:
     if field and value:
         read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
         cursor = CONN.cursor()
         books = cursor.execute(read_sql, (str("%" + value + "%"),)).fetchall()
-        for book in books:
-            click.echo(Book(*book))
+        if books:
+            for book in books:
+                click.echo(dict(book))
+        else:
+            click.echo(f"There are no books with {field} containing {value}.")
     else:
         cursor = CONN.cursor()
         books = cursor.execute("SELECT * FROM books").fetchall()
         for book in books:
-            click.echo(Book(*book))
-    CONN.close()
+            click.echo(dict(book))
+    return books
+
+
+# EDIT BOOK
+@click.command()
+@click.argument("id")
+def edit(id: str) -> None:
+    ctx = click.Context(read)
+    books = ctx.forward(read, field="id", value=id)
+    if books:
+        book = dict(books[0])
+        update_values = []
+        update_sql = "SET "
+        for k, v in book.items():
+            data = input(f"Edit {k} ({v}): ")
+            if data:
+                update_sql += f"{k} = ?, "
+                update_values.append(data)
+        full_sql = f"""
+        UPDATE books
+        {update_sql[0:-2]}
+        WHERE id = {id}
+        """
+        cursor = CONN.cursor()
+        cursor.execute(full_sql, update_values)
+        CONN.commit()
+    else:
+        click.echo(f"There is no book with {id=}")
 
 
 if __name__ == "__main__":
     cli.add_command(add)
     cli.add_command(read)
+    cli.add_command(edit)
     cli()
+    CONN.close()
