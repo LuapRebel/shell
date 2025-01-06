@@ -14,8 +14,8 @@ CONN.execute(
     CREATE TABLE IF NOT EXISTS books(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
-        status TEXT,
         author TEXT,
+        status TEXT,
         date_started TEXT,
         date_completed TEXT
     )
@@ -78,6 +78,26 @@ def add(
     CONN.close()
 
 
+# READ BOOKS
+@click.command()
+@click.option("-f", "--field", help="Field to search within")
+@click.option("-v", "--value", help="Value to search for")
+def read(field: str | None = None, value: str | None = None) -> None:
+    if field and value:
+        read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
+        cursor = CONN.cursor()
+        books = cursor.execute(read_sql, (str("%" + value + "%"),)).fetchall()
+        for book in books:
+            click.echo(Book(*book))
+    else:
+        cursor = CONN.cursor()
+        books = cursor.execute("SELECT * FROM books").fetchall()
+        for book in books:
+            click.echo(Book(*book))
+    CONN.close()
+
+
 if __name__ == "__main__":
     cli.add_command(add)
+    cli.add_command(read)
     cli()
