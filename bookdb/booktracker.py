@@ -137,9 +137,30 @@ def edit(id: str) -> None:
         {update_sql[0:-2]}
         WHERE id = {id}
         """
-        cursor = CONN.cursor()
-        cursor.execute(full_sql, update_values)
-        CONN.commit()
+        if update_values:
+            cursor = CONN.cursor()
+            cursor.execute(full_sql, update_values)
+            CONN.commit()
+    else:
+        click.echo(f"There is no book with {id=}")
+
+
+@click.command()
+@click.argument("id")
+def delete(id: str) -> None:
+    click.echo(f"Attempting to delete book with {id=}")
+    ctx = click.Context(read)
+    books = ctx.forward(read, field="id", value=id)
+    if books:
+        to_delete = (
+            input("Are you sure you want to delete this book (y/n): ").strip().lower()
+            == "y"
+        )
+        if to_delete:
+            delete_sql = f"DELETE FROM books WHERE id = {id}"
+            cursor = CONN.cursor()
+            cursor.execute(delete_sql)
+            CONN.commit()
     else:
         click.echo(f"There is no book with {id=}")
 
@@ -148,5 +169,6 @@ if __name__ == "__main__":
     cli.add_command(add)
     cli.add_command(read)
     cli.add_command(edit)
+    cli.add_command(delete)
     cli()
     CONN.close()
