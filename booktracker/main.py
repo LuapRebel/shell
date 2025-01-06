@@ -7,6 +7,8 @@ from pathlib import Path
 
 from rich import print
 
+DB_PATH = "booktracker/book_db.csv"
+
 
 class Status(StrEnum):
     TBR = "TBR"
@@ -32,7 +34,23 @@ class Book:
             self.id = 1
 
 
-def read_books(path: Path = Path("booktracker/book_db.csv")) -> list[dict]:
+def write_book(book: Book) -> None:
+    path = Path(DB_PATH)
+    book_dict = asdict(book)
+    if path.is_file():
+        with open(path, "a", newline="\n") as f:
+            writer = csv.writer(f)
+            writer.writerow(book_dict.values())
+    else:
+        with open(path, "w", newline="\n") as f:
+            fieldnames = list(Book.__annotations__)
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(book_dict)
+    print(f"Added {book.title} by {book.author} to book_db.csv")
+
+
+def read_books(path: Path = Path(DB_PATH)) -> list[dict]:
     if path.is_file():
         with open(path, "r") as f:
             reader = csv.DictReader(f)
@@ -47,20 +65,24 @@ def filter_books(field: str | None = None, value: str | None = None) -> list[dic
     return books
 
 
-def write_book(book: Book) -> None:
-    path = Path("booktracker/book_db.csv")
-    book_dict = asdict(book)
-    if path.is_file():
-        with open(path, "a", newline="\n") as f:
-            writer = csv.writer(f)
-            writer.writerow(book_dict.values())
+def edit_book(id: str) -> None:
+    book = filter_books(field="id", value=id)
+    if book:
+        editbook = book[0]
+        for k, v in editbook.items():
+            data = input(f"Edit {k} ({v}): ")
+            if data:
+                editbook[k] = data
+            else:
+                editbook[k] = v
+        books = [b for b in read_books() if b["id"] != id]
+        books.append(editbook)
+        with open(DB_PATH, "w", newline="") as f:
+            dict_writer = csv.DictWriter(f, fieldnames=list(Book.__annotations__))
+            dict_writer.writeheader()
+            dict_writer.writerows(books)
     else:
-        with open(path, "w", newline="\n") as f:
-            fieldnames = list(Book.__annotations__)
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow(book_dict)
-    print(f"Added {book.title} by {book.author} to book_db.csv")
+        print(f"There is no book with {id=}")
 
 
 parser = argparse.ArgumentParser(
@@ -100,6 +122,10 @@ read_parser = subparsers.add_parser("read", help="View existing books")
 read_parser.add_argument("-f", "--field", type=str)
 read_parser.add_argument("-v", "--value", type=str)
 
+# EDIT BOOKS
+edit_parser = subparsers.add_parser("edit", help="Edit a book using its ID")
+edit_parser.add_argument("id", type=str)
+
 args = parser.parse_args()
 
 if args.command == "add":
@@ -112,3 +138,6 @@ elif args.command == "read":
         print(filter_books(args.field, args.value))
     else:
         print(filter_books())
+elif args.command == "edit":
+    if args.id:
+        edit_book(args.id)
