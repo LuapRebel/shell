@@ -11,5 +11,6 @@ wheels/
 
 # local
 sandbox/
-booktracker/book_db.csv
-bookdb/books.db
+booktracker_argparse/books.csv
+booktracker_click/books.db
+booktracker_textual/books.db
