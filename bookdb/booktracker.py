@@ -1,13 +1,15 @@
 from dataclasses import asdict, dataclass
 from datetime import date
 from enum import StrEnum
+from pathlib import Path
 import sqlite3
 
 import click
 from rich import print
 
 
-DB_PATH = "bookdb/books.db"
+DIR = Path(__file__).parent.resolve()
+DB_PATH = f"{DIR}/books.db"
 CONN = sqlite3.connect(DB_PATH)
 CONN.row_factory = sqlite3.Row
 

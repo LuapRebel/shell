@@ -7,7 +7,8 @@ from pathlib import Path
 
 from rich import print
 
-DB_PATH = "booktracker/book_db.csv"
+DIR = Path(__file__).parent.resolve()
+DB_PATH = f"{DIR}/book_db.csv"
 
 
 class Status(StrEnum):
