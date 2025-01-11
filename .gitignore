@@ -14,3 +14,4 @@ sandbox/
 booktracker_argparse/books.csv
 booktracker_click/books.db
 booktracker_textual/books.db
+textual.log
