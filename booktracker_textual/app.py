@@ -3,11 +3,13 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Markdown
 
 from conn import CONN
-from books import BookInputScreen, BookScreen
+from books import BookFilterScreen, BookInputScreen, BookScreen
 
 
 MARKDOWN = """
 A Python textual TUI to manage books.
+
+Add Books by pressing `b` to View the existing Books and then `a` to add a new one.
 """
 
 
@@ -21,7 +23,12 @@ class HomeScreen(Screen):
 
 class BookTracker(App):
     CSS_PATH = "app.tcss"
-    SCREENS = {"home": HomeScreen, "books": BookScreen, "book_input": BookInputScreen}
+    SCREENS = {
+        "home": HomeScreen,
+        "books": BookScreen,
+        "book_filter": BookFilterScreen,
+        "book_input": BookInputScreen,
+    }
     BINDINGS = [
         ("h", "push_screen('home')", "Home"),
         ("b", "push_screen('books')", "Books"),
