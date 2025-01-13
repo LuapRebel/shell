@@ -1,9 +1,9 @@
 from pydantic import ValidationError
 from textual.app import ComposeResult
-from textual.containers import Grid
+from textual.containers import Container
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Footer, Header, Input, Label
+from textual.widgets import Button, DataTable, Footer, Header, Input
 
 from conn import CONN
 from db import Book
@@ -56,16 +56,19 @@ class BookInputScreen(ModalScreen):
             print(e)
 
 
-class BookFilterScreen(ModalScreen[list]):
+class BookFilterScreen(Screen):
     """Widget to filter books by field and search term"""
 
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Input(placeholder="Field to search", id="field")
-        yield Input(placeholder="Search term", id="value")
-        yield Button("Submit", id="filter-submit")
+        yield Container(
+            Input(placeholder="Field to search", id="field"),
+            Input(placeholder="Search term", id="value"),
+            Button("Submit", id="filter-submit"),
+            id="filter-container",
+        )
         yield DataTable(id="filter-table")
         yield Footer()
 
@@ -83,6 +86,7 @@ class BookFilterScreen(ModalScreen[list]):
         table.clear()
         table.add_columns(*columns)
         table.add_rows(data)
+        table.zebra_stripes = True
 
     def _on_screen_resume(self) -> None:
         table = self.query_one("#filter-table")
@@ -103,7 +107,7 @@ class BookScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        table = self.query_one(DataTable)
+        table = self.query_one("#books-table")
         cur = CONN.cursor()
         data = cur.execute("SELECT * FROM books").fetchall()
         columns = [desc[0] for desc in cur.description]
@@ -112,7 +116,7 @@ class BookScreen(Screen):
         table.zebra_stripes = True
 
     def _on_screen_resume(self) -> None:
-        table = self.query_one(DataTable)
+        table = self.query_one("#books-table")
         table.clear()
         cur = CONN.cursor()
         data = cur.execute("SELECT * FROM books").fetchall()

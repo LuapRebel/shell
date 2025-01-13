@@ -1,0 +1,4 @@
+#filter-container {
+    dock: top;
+    height: auto;
+}
