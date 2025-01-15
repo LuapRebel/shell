@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Footer, Header, Input
+from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog
 
 from conn import CONN
 from db import Book
@@ -46,9 +46,7 @@ class BookInputScreen(ModalScreen):
             Book(**validation_dict)
             cur = CONN.cursor()
             cur.execute(
-                """INSERT INTO books(title, author, status, date_started, date_completed)
-                VALUES (?, ?, ?, ?, ?)
-                """,
+                f"INSERT INTO books({", ".join(keys)}) VALUES (?, ?, ?, ?, ?)",
                 values,
             )
             CONN.commit()
@@ -108,7 +106,14 @@ class BookScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.load_books()
+
+    def _on_screen_resume(self) -> None:
+        self.load_books()
+
+    def load_books(self) -> None:
         table = self.query_one("#books-table")
+        table.clear(columns=True)
         cur = CONN.cursor()
         data = cur.execute("SELECT * FROM books").fetchall()
         columns = [desc[0] for desc in cur.description]
