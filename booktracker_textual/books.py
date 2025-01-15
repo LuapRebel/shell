@@ -24,7 +24,6 @@ class BookEditWidget(Widget):
                 placeholder="Date Completed(YYYY-MM-DD)", id="book-date-completed"
             )
             yield Button("Submit", id="book-submit")
-            yield Footer()
 
 
 class BookInputScreen(ModalScreen):
@@ -36,6 +35,7 @@ class BookInputScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
+        yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed):
         inputs = self.query(Input)
@@ -72,32 +72,34 @@ class BookFilterScreen(Screen):
             Button("Submit", id="filter-submit"),
             id="filter-container",
         )
-        yield DataTable(id="filter-table")
+        yield RichLog(id="filter-log")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        inputs = self.query(Input)
-        input_data = [i.value for i in inputs]
-        for i in inputs:
-            i.clear()
-        read_sql = f"SELECT * FROM books WHERE {input_data[0]} LIKE ?"
-        binding = (str("%" + input_data[1] + "%"),)
+        field = self.query_one("#field").value
+        value = self.query_one("#value").value
+        read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
+        binding = (f"%{value}%",)
         cur = CONN.cursor()
         data = cur.execute(read_sql, binding).fetchall()
-        columns = [desc[0] for desc in cur.description]
-        table = self.query_one("#filter-table")
-        table.clear(columns=True)
-        table.add_columns(*columns)
-        table.add_rows(data)
-        table.zebra_stripes = True
+        books = [Book(**dict(zip(Book.model_fields.keys(), d))) for d in data]
+        rich_log = self.query_one("#filter-log")
+        rich_log.clear()
+        rich_log.write(books)
+        for i in self.query(Input):
+            i.clear()
+
+    def _on_screen_resume(self) -> None:
+        rich_log = self.query_one("#filter-log")
+        rich_log.clear()
 
 
 class BookScreen(Screen):
     """Widget to manage book collection."""
 
     BINDINGS = [
-        ("f", "filter_books", "Filter Books"),
-        ("a", "add_book", "Add Book"),
+        ("f", "filter_books", "Filter"),
+        ("a", "add_book", "Add"),
     ]
 
     def compose(self) -> ComposeResult:

@@ -45,9 +45,6 @@ class BookTracker(App):
     def on_close(self) -> None:
         CONN.close()
 
-    def action_quit(self) -> None:
-        self.exit()
-
 
 if __name__ == "__main__":
     app = BookTracker()
