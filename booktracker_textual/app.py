@@ -32,7 +32,6 @@ class BookTracker(App):
     BINDINGS = [
         ("h", "push_screen('home')", "Home"),
         ("b", "push_screen('books')", "Books"),
-        ("q", "quit", "Quit"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -40,6 +39,7 @@ class BookTracker(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.theme = "gruvbox"
         self.push_screen(HomeScreen())
 
     def on_close(self) -> None:
