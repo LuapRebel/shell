@@ -13,15 +13,18 @@ class BookEditWidget(Widget):
     """Widget to edit book information"""
 
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="Title", id="book-title")
-        yield Input(placeholder="Author (Lastname, First)", id="book-author")
-        yield Input(
-            placeholder="Status (TBR, IN_PROGRESS, COMPLETED)", id="book-status"
-        )
-        yield Input(placeholder="Date Started (YYYY-MM-DD)", id="book-date-started")
-        yield Input(placeholder="Date Completed(YYYY-MM-DD)", id="book-date-completed")
-        yield Button("Submit", id="book-submit")
-        yield Footer()
+        with Container(id="book-edit-widget"):
+            yield Input(placeholder="Title", id="book-title")
+            yield Input(placeholder="Author (Lastname, First)", id="book-author")
+            yield Input(
+                placeholder="Status (TBR, IN_PROGRESS, COMPLETED)", id="book-status"
+            )
+            yield Input(placeholder="Date Started (YYYY-MM-DD)", id="book-date-started")
+            yield Input(
+                placeholder="Date Completed(YYYY-MM-DD)", id="book-date-completed"
+            )
+            yield Button("Submit", id="book-submit")
+            yield Footer()
 
 
 class BookInputScreen(ModalScreen):
@@ -83,14 +86,10 @@ class BookFilterScreen(Screen):
         data = cur.execute(read_sql, binding).fetchall()
         columns = [desc[0] for desc in cur.description]
         table = self.query_one("#filter-table")
-        table.clear()
+        table.clear(columns=True)
         table.add_columns(*columns)
         table.add_rows(data)
         table.zebra_stripes = True
-
-    def _on_screen_resume(self) -> None:
-        table = self.query_one("#filter-table")
-        table.clear()
 
 
 class BookScreen(Screen):
@@ -114,13 +113,6 @@ class BookScreen(Screen):
         table.add_columns(*columns)
         table.add_rows(data)
         table.zebra_stripes = True
-
-    def _on_screen_resume(self) -> None:
-        table = self.query_one("#books-table")
-        table.clear()
-        cur = CONN.cursor()
-        data = cur.execute("SELECT * FROM books").fetchall()
-        table.add_rows(data)
 
     def action_filter_books(self) -> None:
         self.app.push_screen("book_filter")
