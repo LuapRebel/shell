@@ -15,40 +15,78 @@ class BookEditWidget(Widget):
 
     def compose(self) -> ComposeResult:
         with Container(id="book-edit-widget"):
-            yield Input(placeholder="Title", id="book-title")
-            yield Input(placeholder="Author (Lastname, First)", id="book-author")
-            yield Input(
-                placeholder="Status (TBR, IN_PROGRESS, COMPLETED)", id="book-status"
-            )
-            yield Input(placeholder="Date Started (YYYY-MM-DD)", id="book-date-started")
-            yield Input(
-                placeholder="Date Completed(YYYY-MM-DD)", id="book-date-completed"
-            )
-            yield Button("Submit", id="book-submit")
+            yield Input(placeholder="Title", id="title")
+            yield Input(placeholder="Author (Lastname, First)", id="author")
+            yield Input(placeholder="Status (TBR, IN_PROGRESS, COMPLETED)", id="status")
+            yield Input(placeholder="Date Started (YYYY-MM-DD)", id="date-started")
+            yield Input(placeholder="Date Completed (YYYY-MM-DD)", id="date-completed")
 
 
-class BookInputScreen(ModalScreen):
+class BookDeleteScreen(ModalScreen):
+    """Screen to delete a Book given an ID"""
+
+    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        with Container(id="book-delete-screen"):
+            yield Input(placeholder="ID", id="id-delete")
+            yield Button("Delete", id="delete-submit")
+            yield Footer()
+
+    @on(Button.Pressed, "#delete-submit")
+    def delete_book_pressed(self) -> None:
+
+        def check_delete(delete: bool | None) -> None:
+            if delete:
+                id = self.query_one("#id-delete")
+                if id:
+                    cur = CONN.cursor()
+                    cur.execute("DELETE FROM books WHERE id=?", (id.value,))
+                    CONN.commit()
+            id.clear()
+
+        self.app.push_screen("delete_confirmation", check_delete)
+
+
+class BookDeleteConfirmationScreen(ModalScreen[bool]):
+    """Widget providing dialog box to allow users to delete a book or cancel"""
+
+    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        with Container(id="book-delete-widget"):
+            yield Static("Are you sure you want to delete?")
+            yield Button("Yes", id="delete-book")
+            yield Button("No", id="cancel-delete-book")
+            yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "delete-book":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+
+class BookAddScreen(ModalScreen):
     """Modal screen to provide inputs to create a new Book"""
 
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Cancel"),
-    ]
+    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
+        yield Button("Submit", id="add")
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed):
+    @on(Button.Pressed, "#add")
+    def book_submit_pressed(self):
         inputs = self.query(Input)
-        values = [i.value for i in inputs]
-        keys = ["title", "author", "status", "date_started", "date_completed"]
-        validation_dict = dict(zip(keys, values))
+        validation_dict = {i.id.replace("-", "_"): i.value for i in inputs}
         try:
             Book(**validation_dict)
             cur = CONN.cursor()
             cur.execute(
-                f"INSERT INTO books({", ".join(keys)}) VALUES (?, ?, ?, ?, ?)",
-                values,
+                f"INSERT INTO books({", ".join(validation_dict.keys())}) VALUES (?, ?, ?, ?, ?)",
+                tuple(validation_dict.values()),
             )
             CONN.commit()
             for i in inputs:
@@ -76,18 +114,19 @@ class BookFilterScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Container(
-            Input(placeholder="Field to search", id="field"),
-            Input(placeholder="Search term", id="value"),
-            Button("Submit", id="filter-submit"),
+        yield Horizontal(
+            Input(placeholder="Field to search", id="filter-field", classes="column"),
+            Input(placeholder="Search term", id="filter-value", classes="column"),
+            Button("Submit", id="filter-submit", classes="column"),
             id="filter-container",
         )
         yield RichLog(id="filter-log")
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        field = self.query_one("#field").value
-        value = self.query_one("#value").value
+    @on(Button.Pressed, "#filter-submit")
+    def filter_submit_pressed(self) -> None:
+        field = self.query_one("#filter-field").value
+        value = self.query_one("#filter-value").value
         read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
         binding = (f"%{value}%",)
         cur = CONN.cursor()
