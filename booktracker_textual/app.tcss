@@ -1,4 +1,32 @@
+BookFilterScreen {
+    height: auto;
+}
+
+BookEditWidget {
+    height: 15;
+}
+
+BookInputScreen {
+    background: $surface;
+}
+
 #filter-container {
     dock: top;
     height: auto;
 }
+
+#filter-log {
+    min-height: 90%;
+    height: auto;
+}
+
+#book-edit-delete-widget {
+    dock: bottom;
+}
+
+.column {
+    width: 1fr;
+    margin: 1;
+}
+
+

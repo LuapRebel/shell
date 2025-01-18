@@ -1,9 +1,10 @@
 from pydantic import ValidationError
+from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog
+from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Static
 
 from conn import CONN
 from db import Book
@@ -57,6 +58,17 @@ class BookInputScreen(ModalScreen):
             print(e)
 
 
+class BookEditScreen(ModalScreen):
+    """Modal Screen to provide inputs to edit an existing book"""
+
+    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        yield BookEditWidget()
+        yield Button("Submit", id="book-edit-submit")
+        yield Footer()
+
+
 class BookFilterScreen(Screen):
     """Widget to filter books by field and search term"""
 
@@ -96,8 +108,10 @@ class BookScreen(Screen):
     """Widget to manage book collection."""
 
     BINDINGS = [
-        ("f", "filter_books", "Filter"),
-        ("a", "add_book", "Add"),
+        ("f", "app.push_screen('filter')", "Filter"),
+        ("a", "app.push_screen('add')", "Add"),
+        ("e", "app.push_screen('edit')", "Edit"),
+        ("d", "app.push_screen('delete')", "Delete"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -120,9 +134,3 @@ class BookScreen(Screen):
         table.add_columns(*columns)
         table.add_rows(data)
         table.zebra_stripes = True
-
-    def action_filter_books(self) -> None:
-        self.app.push_screen("book_filter")
-
-    def action_add_book(self) -> None:
-        self.app.push_screen("book_input")

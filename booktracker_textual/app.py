@@ -3,7 +3,14 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Markdown
 
 from conn import CONN
-from books import BookFilterScreen, BookInputScreen, BookScreen
+from books import (
+    BookAddScreen,
+    BookDeleteScreen,
+    BookDeleteConfirmationScreen,
+    BookEditScreen,
+    BookFilterScreen,
+    BookScreen,
+)
 
 
 MARKDOWN = """
@@ -26,10 +33,14 @@ class BookTracker(App):
     SCREENS = {
         "home": HomeScreen,
         "books": BookScreen,
-        "book_filter": BookFilterScreen,
-        "book_input": BookInputScreen,
+        "filter": BookFilterScreen,
+        "add": BookAddScreen,
+        "edit": BookEditScreen,
+        "delete": BookDeleteScreen,
+        "delete_confirmation": BookDeleteConfirmationScreen,
     }
     BINDINGS = [
+        ("escape", "pop_screen", "Cancel"),
         ("h", "push_screen('home')", "Home"),
         ("b", "push_screen('books')", "Books"),
     ]
