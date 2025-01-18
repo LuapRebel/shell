@@ -1,14 +1,14 @@
 import argparse
 import csv
 from dataclasses import asdict, dataclass, field
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 
 from rich import print
 
 DIR = Path(__file__).parent.resolve()
-DB_PATH = f"{DIR}/books.csv"
+DB_PATH = DIR / "books.csv"
 
 
 class Status(StrEnum):
@@ -24,20 +24,30 @@ class Book:
     status: Status = "TBR"
     date_started: date | None = None
     date_completed: date | None = None
-    id: int = field(init=False)
+    id: int | None = None
+    days_to_read: int | None = None
 
     def __post_init__(self):
-        books = read_books()
-        if books:
-            last_book_id = int(books[-1]["id"])
-            self.id = last_book_id + 1
+        if not self.id:
+            books = read_books()
+            if books:
+                last_book_id = int(books[-1].id)
+                self.id = last_book_id + 1
+            else:
+                self.id = 1
+
+        if self.date_started and self.date_completed:
+            ds = datetime.strptime(self.date_started, "%Y-%m-%d")
+            dc = datetime.strptime(self.date_completed, "%Y-%m-%d")
+            self.days_to_read = (dc - ds).days + 1  # inclusive
         else:
-            self.id = 1
+            self.days_to_read = None
 
 
 def write_book(book: Book) -> None:
     path = Path(DB_PATH)
     book_dict = asdict(book)
+    del book_dict["days_to_read"]  # Do not store this field
     if path.is_file():
         with open(path, "a", newline="\n") as f:
             writer = csv.writer(f)
@@ -55,14 +65,14 @@ def read_books(path: Path = Path(DB_PATH)) -> list[dict]:
     if path.is_file():
         with open(path, "r") as f:
             reader = csv.DictReader(f)
-            return [row for row in reader]
+            return [Book(**row) for row in reader]
     return []
 
 
 def filter_books(field: str | None = None, value: str | None = None) -> list[dict]:
     books = read_books()
     if field and value:
-        return [b for b in books if value in str(b[field])]
+        return [b for b in books if value in str(getattr(b, field))]
     return books
 
 
@@ -82,7 +92,7 @@ def write_books(books: list[dict]) -> None:
 
 
 def edit_book(id: str) -> None:
-    book = get_book_by_id(id)
+    book = asdict(get_book_by_id(id))
     if book:
         for k, v in book.items():
             data = input(f"Edit {k} ({v}): ")
@@ -90,7 +100,7 @@ def edit_book(id: str) -> None:
                 book[k] = data
             else:
                 book[k] = v
-        books = [b for b in read_books() if b["id"] != id]
+        books = [asdict(b) for b in read_books() if b.id != id]
         books.append(book)
         write_books(books)
 
@@ -98,9 +108,9 @@ def edit_book(id: str) -> None:
 def delete_book(id: str) -> None:
     book = get_book_by_id(id)
     if book:
-        books = [b for b in read_books() if b["id"] != id]
+        books = [asdict(b) for b in read_books() if b.id != id]
         write_books(books)
-        print(f"Deleted {book['title']} by {book['author']}")
+        print(f"Deleted {book.title} by {book.author}")
 
 
 parser = argparse.ArgumentParser(
@@ -159,7 +169,7 @@ elif args.command == "read":
     if args.field and args.value:
         print(filter_books(args.field, args.value))
     else:
-        print(filter_books())
+        print(read_books())
 elif args.command == "edit":
     if args.id:
         edit_book(args.id)
