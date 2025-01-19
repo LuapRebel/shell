@@ -131,7 +131,7 @@ class BookFilterScreen(Screen):
         binding = (f"%{value}%",)
         cur = CONN.cursor()
         data = cur.execute(read_sql, binding).fetchall()
-        books = [Book(**dict(zip(Book.model_fields.keys(), d))) for d in data]
+        books = [Book(**d) for d in data]
         rich_log = self.query_one("#filter-log")
         rich_log.clear()
         rich_log.write(books)
@@ -169,7 +169,9 @@ class BookScreen(Screen):
         table.clear(columns=True)
         cur = CONN.cursor()
         data = cur.execute("SELECT * FROM books").fetchall()
-        columns = [desc[0] for desc in cur.description]
+        books = [Book(**d).model_dump().values() for d in data]
+        columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
         table.add_columns(*columns)
+        table.add_rows(books)
         table.add_rows(data)
         table.zebra_stripes = True
