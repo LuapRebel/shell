@@ -8,10 +8,16 @@ import click
 from rich import print
 
 
-DIR = Path(__file__).parent.resolve()
-DB_PATH = f"{DIR}/books.db"
+DB_PATH = Path(__file__).parent.resolve() / "books.db"
 CONN = sqlite3.connect(DB_PATH)
-CONN.row_factory = sqlite3.Row
+
+
+def dict_factory(cursor, row):
+    fields = [column[0] for column in cursor.description]
+    return {k: v for k, v in zip(fields, row)}
+
+
+CONN.row_factory = dict_factory
 
 CONN.execute(
     """
