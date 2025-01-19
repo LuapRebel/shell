@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 import sqlite3
@@ -8,15 +8,13 @@ import click
 from rich import print
 
 
-DB_PATH = Path(__file__).parent.resolve() / "books.db"
-CONN = sqlite3.connect(DB_PATH)
-
-
 def dict_factory(cursor, row):
     fields = [column[0] for column in cursor.description]
     return {k: v for k, v in zip(fields, row)}
 
 
+DB_PATH = Path(__file__).parent.resolve() / "books.db"
+CONN = sqlite3.connect(DB_PATH)
 CONN.row_factory = dict_factory
 
 CONN.execute(
@@ -47,10 +45,17 @@ class Book:
     status: Status = "TBR"
     date_started: date | None = None
     date_completed: date | None = None
+    days_to_read: int | None = None
 
     def __post_init__(self):
         if self.status not in list(Status):
             raise ValueError("status is invalid")
+        if self.date_started and self.date_completed:
+            ds = datetime.strptime(self.date_started, "%Y-%m-%d")
+            dc = datetime.strptime(self.date_completed, "%Y-%m-%d")
+            self.days_to_read = (dc - ds).days + 1  # inclusive
+        else:
+            self.days_to_read = None
 
 
 @click.group()
@@ -115,14 +120,14 @@ def read(field: str | None = None, value: str | None = None) -> list[dict]:
         books = cursor.execute(read_sql, (str("%" + value + "%"),)).fetchall()
         if books:
             for book in books:
-                print(dict(book))
+                print(Book(**book))
         else:
             print(f"There are no books with {field} containing {value}.")
     else:
         cursor = CONN.cursor()
         books = cursor.execute("SELECT * FROM books").fetchall()
         for book in books:
-            print(dict(book))
+            print(Book(**book))
     return books
 
 
@@ -133,7 +138,7 @@ def edit(id: str) -> None:
     ctx = click.Context(read)
     books = ctx.forward(read, field="id", value=id)
     if books:
-        book = dict(books[0])
+        book = books[0]
         update_values = []
         update_sql = "SET "
         for k, v in book.items():
