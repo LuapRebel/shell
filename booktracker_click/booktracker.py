@@ -94,12 +94,13 @@ def add(
         date_started=date_started,
         date_completed=date_completed,
     )
+    book_values = tuple(asdict(book).values())[0:-1]  # Remove days_to_read
     add_sql = f"""
         INSERT INTO books (id, title, author, status, date_started, date_completed)
         VALUES (?, ?, ?, ?, ?, ?);
     """
     cursor = CONN.cursor()
-    cursor.execute(add_sql, tuple(asdict(book).values()))
+    cursor.execute(add_sql, book_values)
     CONN.commit()
     print(f"Added {book} to database")
 
