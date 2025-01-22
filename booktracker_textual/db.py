@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, computed_field
@@ -9,8 +9,8 @@ class Book(BaseModel, extra="allow"):
     title: str = ""
     author: str = ""
     status: Literal["TBR", "IN_PROGRESS", "COMPLETED"] = "TBR"
-    date_started: date | str = ""
-    date_completed: date | str = ""
+    date_started: str | None = None
+    date_completed: str | None = None
 
     @computed_field
     @property
