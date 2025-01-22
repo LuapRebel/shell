@@ -1,5 +1,7 @@
 from pydantic import ValidationError
+from textual import events
 from textual import on
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen, Screen
@@ -93,18 +95,83 @@ class BookAddScreen(ModalScreen):
                 i.clear()
             self.app.push_screen("books")
         except ValidationError as e:
-            print(e)
+            self.notify(str(e))
 
 
-class BookEditScreen(ModalScreen):
+class BookEditConfirmationScreen(ModalScreen[str | None]):
+    """Modal screen to confirm ID of book to be edited"""
+
+    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        yield Input(placeholder="ID", id="id-edit")
+        yield Button("Edit", id="edit-submit")
+
+    @on(Button.Pressed, "#edit-submit")
+    def edit_book_pressed(self) -> None:
+        book_id = self.query_one("#id-edit")
+        if book_id:
+            self.dismiss(book_id.value)
+        else:
+            self.dismiss(None)
+
+
+class BookEditScreen(Screen):
     """Modal Screen to provide inputs to edit an existing book"""
 
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
-        yield Button("Submit", id="book-edit-submit")
+        yield Button("Submit", id="edit-submit")
         yield Footer()
+
+    @work
+    async def on_mount(self) -> None:
+        book_id = await self.app.push_screen_wait(BookEditConfirmationScreen())
+        if book_id:
+            self.book_id = book_id
+            cur = CONN.cursor()
+            book = cur.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
+            inputs = self.query(Input)
+            for i in inputs:
+                key = i.id.replace("-", "_")
+                i.value = book[key]
+        else:
+            self.app.push_screen("books")
+
+    def clear_inputs(self) -> None:
+        inputs = self.query(Input)
+        for i in inputs:
+            i.clear()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.clear_inputs()
+
+    @on(Button.Pressed, "#edit-submit")
+    def edit_submit_pressed(self):
+        inputs = self.query(Input)
+        validation_dict = {i.id.replace("-", "_"): i.value for i in inputs}
+        try:
+            Book(**validation_dict)
+            update_values = []
+            update_sql = "SET "
+            for k, v in validation_dict.items():
+                update_sql += f"{k} = ?, "
+                update_values.append(v)
+            full_sql = f"""
+            UPDATE books
+            {update_sql[0:-2]}
+            WHERE id = {self.book_id}
+            """
+            cursor = CONN.cursor()
+            cursor.execute(full_sql, update_values)
+            CONN.commit()
+            self.clear_inputs()
+        except ValidationError as e:
+            self.notify(str(e))
+        self.app.push_screen("books")
 
 
 class BookFilterScreen(Screen):

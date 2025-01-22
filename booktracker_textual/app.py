@@ -8,6 +8,7 @@ from books import (
     BookDeleteScreen,
     BookDeleteConfirmationScreen,
     BookEditScreen,
+    BookEditConfirmationScreen,
     BookFilterScreen,
     BookScreen,
 )
@@ -31,16 +32,16 @@ class HomeScreen(Screen):
 class BookTracker(App):
     CSS_PATH = "app.tcss"
     SCREENS = {
-        "home": HomeScreen,
-        "books": BookScreen,
-        "filter": BookFilterScreen,
         "add": BookAddScreen,
-        "edit": BookEditScreen,
+        "books": BookScreen,
         "delete": BookDeleteScreen,
         "delete_confirmation": BookDeleteConfirmationScreen,
+        "edit": BookEditScreen,
+        "edit_confirmation": BookEditConfirmationScreen,
+        "filter": BookFilterScreen,
+        "home": HomeScreen,
     }
     BINDINGS = [
-        ("escape", "pop_screen", "Cancel"),
         ("h", "push_screen('home')", "Home"),
         ("b", "push_screen('books')", "Books"),
     ]
