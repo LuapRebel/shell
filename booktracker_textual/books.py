@@ -240,5 +240,4 @@ class BookScreen(Screen):
         columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
         table.add_columns(*columns)
         table.add_rows(books)
-        table.add_rows(data)
         table.zebra_stripes = True
