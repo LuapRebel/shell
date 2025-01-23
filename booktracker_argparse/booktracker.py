@@ -245,13 +245,15 @@ elif args.command == "delete":
 elif args.command == "stats":
     books = read_books()
     stats = BookStats(books)
-    if args.all and not args.year:
-        print(stats.all_stats())
-    elif args.all and args.year:
-        print(stats.year_stats(args.year, args.all))
-    elif args.year and not args.all:
-        print(stats.year_stats(args.year))
-    elif args.year and args.month:
-        print(stats.month_stats(args.year, args.month))
-    elif args.month:
+    if args.all:
+        if args.year:
+            print(stats.year_stats(args.year, args.all))
+        else:
+            print(stats.all_stats())
+    else:
+        if args.year and args.month:
+            print(stats.month_stats(args.year, args.month))
+        elif not args.month:
+            print(stats.year_stats(args.year))
+    if args.month and not args.year:
         print("ERROR: You must provide a year in addition to month.")
