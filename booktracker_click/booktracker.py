@@ -3,6 +3,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 import sqlite3
+from statistics import mean
 
 import click
 from rich import print
@@ -72,7 +73,64 @@ def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
         cursor = CONN.cursor()
         books = cursor.execute("SELECT * FROM books").fetchall()
     if books:
-        return books
+        return [Book(**book) for book in books]
+
+
+class BookStats:
+    """
+    Class to generate stats for books read, based on date_completed
+    """
+
+    def __init__(self, books: list[Book]):
+        self.books = books
+        self.ymd = [self.get_ymd(book) for book in books]
+
+    def get_ymd(self, book: Book) -> Book:
+        if book.status == "COMPLETED" and book.date_completed:
+            ymd = datetime.fromisoformat(book.date_completed)
+            return (
+                ymd.year,
+                ymd.month,
+                book.days_to_read,
+            )
+
+    def all_stats(self) -> dict:
+        years = {book[0] for book in self.ymd if book}
+        stats = [
+            [self.month_stats(year, month) for month in range(1, 13)] for year in years
+        ]
+        return [x for xs in stats for x in xs]
+
+    def month_stats(self, year: int, month: int) -> dict:
+        books_read = [
+            book for book in self.ymd if book and book[0] == year and book[1] == month
+        ]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        return {
+            "year": year,
+            "month": month,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
+
+    def year_stats(self, year: int, all: bool = False) -> dict:
+        books_read = [book for book in self.ymd if book and book[0] == year]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        if all:
+            return [self.month_stats(year, month) for month in range(1, 13)]
+        return {
+            "year": year,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
 
 
 @click.group()
@@ -141,15 +199,13 @@ def read(field: str | None = None, value: str | None = None) -> list[Book]:
         if not books:
             print("There are no books.")
     if books:
-        print([Book(**book) for book in books])
+        print(books)
 
 
 # EDIT BOOK
 @click.command()
 @click.argument("id")
 def edit(id: str) -> None:
-    # ctx = click.Context(read)
-    # books = ctx.forward(read, field="id", value=id)
     books = get_books(field="id", value=id)
     if books:
         book = books[0]
@@ -178,7 +234,6 @@ def edit(id: str) -> None:
 @click.argument("id")
 def delete(id: str) -> None:
     print(f"Attempting to delete book with {id=}")
-    ctx = click.Context(read)
     books = get_books(field="id", value=id)
     if books:
         to_delete = (
@@ -194,10 +249,39 @@ def delete(id: str) -> None:
         print(f"There is no book with {id=}")
 
 
+# STATS
+@click.command()
+@click.option("--all", is_flag=True)
+@click.option("-y", "--year", type=int)
+@click.option("-m", "--month", type=click.IntRange(1, 12))
+def stats(
+    all: bool | None = False, year: int | None = None, month: int | None = None
+) -> None:
+    books = get_books()
+    if books:
+        stats = BookStats(books)
+    else:
+        print("There are no books to run stats on.")
+        click.Context.close()
+    if all:
+        if year:
+            print(stats.year_stats(year, all))
+        else:
+            print(stats.all_stats())
+    else:
+        if year and month:
+            print(stats.month_stats(year, month))
+        elif not month:
+            print(stats.year_stats(year))
+    if month and not year:
+        print("ERROR: You must provide a year in addition to month.")
+
+
 if __name__ == "__main__":
     cli.add_command(add)
     cli.add_command(read)
     cli.add_command(edit)
     cli.add_command(delete)
+    cli.add_command(stats)
     cli()
     CONN.close()
