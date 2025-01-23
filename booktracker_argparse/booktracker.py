@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
+from statistics import mean
 
 from rich import print
 
@@ -37,11 +38,68 @@ class Book:
                 self.id = 1
 
         if self.date_started and self.date_completed:
-            ds = datetime.strptime(self.date_started, "%Y-%m-%d")
-            dc = datetime.strptime(self.date_completed, "%Y-%m-%d")
+            ds = datetime.fromisoformat(self.date_started)
+            dc = datetime.fromisoformat(self.date_completed)
             self.days_to_read = (dc - ds).days + 1  # inclusive
         else:
             self.days_to_read = None
+
+
+class BookStats:
+    """
+    Class to generate stats for books read, based on date_completed
+    """
+
+    def __init__(self, books: list[Book]):
+        self.books = books
+        self.ymd = [self.get_ymd(book) for book in books]
+
+    def get_ymd(self, book: Book) -> Book:
+        if book.status == "COMPLETED" and book.date_completed:
+            ymd = datetime.fromisoformat(book.date_completed)
+            return (
+                ymd.year,
+                ymd.month,
+                book.days_to_read,
+            )
+
+    def all_stats(self) -> dict:
+        years = {book[0] for book in self.ymd if book}
+        stats = [
+            [self.month_stats(year, month) for month in range(1, 13)] for year in years
+        ]
+        return [x for xs in stats for x in xs]
+
+    def month_stats(self, year: int, month: int) -> dict:
+        books_read = [
+            book for book in self.ymd if book and book[0] == year and book[1] == month
+        ]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        return {
+            "year": year,
+            "month": month,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
+
+    def year_stats(self, year: int, all: bool = False) -> dict:
+        books_read = [book for book in self.ymd if book and book[0] == year]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        if all:
+            return [self.month_stats(year, month) for month in range(1, 13)]
+        return {
+            "year": year,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
 
 
 def write_book(book: Book) -> None:
@@ -158,6 +216,14 @@ edit_parser.add_argument("id", type=str)
 delete_parser = subparsers.add_parser("delete", help="Delete a book using its ID")
 delete_parser.add_argument("id", type=str)
 
+# STATS
+stats_parser = subparsers.add_parser(
+    "stats", help="Generate statistics for books completed"
+)
+stats_parser.add_argument("--all", action=argparse.BooleanOptionalAction)
+stats_parser.add_argument("-y", "--year", type=int, default=None)
+stats_parser.add_argument("-m", "--month", type=int, default=None)
+
 args = parser.parse_args()
 
 if args.command == "add":
@@ -176,3 +242,16 @@ elif args.command == "edit":
 elif args.command == "delete":
     if args.id:
         delete_book(args.id)
+elif args.command == "stats":
+    books = read_books()
+    stats = BookStats(books)
+    if args.all and not args.year:
+        print(stats.all_stats())
+    elif args.all and args.year:
+        print(stats.year_stats(args.year, args.all))
+    elif args.year and not args.all:
+        print(stats.year_stats(args.year))
+    elif args.year and args.month:
+        print(stats.month_stats(args.year, args.month))
+    elif args.month:
+        print("ERROR: You must provide a year in addition to month.")
