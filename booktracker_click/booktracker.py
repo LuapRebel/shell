@@ -58,6 +58,23 @@ class Book:
             self.days_to_read = None
 
 
+def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
+    if field and value:
+        if field == "id":
+            read_sql = f"SELECT * FROM books WHERE id=?"
+            binding = (value,)
+        else:
+            read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
+            binding = (str("%" + value + "%"),)
+        cursor = CONN.cursor()
+        books = cursor.execute(read_sql, binding).fetchall()
+    else:
+        cursor = CONN.cursor()
+        books = cursor.execute("SELECT * FROM books").fetchall()
+    if books:
+        return books
+
+
 @click.group()
 def cli() -> None:
     """
@@ -114,30 +131,26 @@ def add(
     help="Field to search within",
 )
 @click.option("-v", "--value", help="Value to search for")
-def read(field: str | None = None, value: str | None = None) -> list[dict]:
+def read(field: str | None = None, value: str | None = None) -> list[Book]:
     if field and value:
-        read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
-        cursor = CONN.cursor()
-        books = cursor.execute(read_sql, (str("%" + value + "%"),)).fetchall()
-        if books:
-            for book in books:
-                print(Book(**book))
-        else:
+        books = get_books(field=field, value=value)
+        if not books:
             print(f"There are no books with {field} containing {value}.")
     else:
-        cursor = CONN.cursor()
-        books = cursor.execute("SELECT * FROM books").fetchall()
-        for book in books:
-            print(Book(**book))
-    return books
+        books = get_books()
+        if not books:
+            print("There are no books.")
+    if books:
+        print([Book(**book) for book in books])
 
 
 # EDIT BOOK
 @click.command()
 @click.argument("id")
 def edit(id: str) -> None:
-    ctx = click.Context(read)
-    books = ctx.forward(read, field="id", value=id)
+    # ctx = click.Context(read)
+    # books = ctx.forward(read, field="id", value=id)
+    books = get_books(field="id", value=id)
     if books:
         book = books[0]
         update_values = []
@@ -160,12 +173,13 @@ def edit(id: str) -> None:
         print(f"There is no book with {id=}")
 
 
+# DELETE
 @click.command()
 @click.argument("id")
 def delete(id: str) -> None:
     print(f"Attempting to delete book with {id=}")
     ctx = click.Context(read)
-    books = ctx.forward(read, field="id", value=id)
+    books = get_books(field="id", value=id)
     if books:
         to_delete = (
             input("Are you sure you want to delete this book (y/n): ").strip().lower()
