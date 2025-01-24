@@ -15,21 +15,6 @@ from books import (
 )
 
 
-MARKDOWN = """
-A Python textual TUI to manage books.
-
-Add Books by pressing `b` to View the existing Books and then `a` to add a new one.
-"""
-
-
-class HomeScreen(Screen):
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Markdown(MARKDOWN)
-        yield Footer()
-
-
 class BookTracker(App):
     CSS_PATH = "app.tcss"
     SCREENS = {
@@ -41,10 +26,8 @@ class BookTracker(App):
         "edit": BookEditScreen,
         "edit_confirmation": BookEditConfirmationScreen,
         "filter": BookFilterScreen,
-        "home": HomeScreen,
     }
     BINDINGS = [
-        ("h", "push_screen('home')", "Home"),
         ("b", "push_screen('books')", "Books"),
     ]
 
@@ -54,7 +37,7 @@ class BookTracker(App):
 
     def on_mount(self) -> None:
         self.theme = "gruvbox"
-        self.push_screen(HomeScreen())
+        self.push_screen(BookScreen())
 
     def on_close(self) -> None:
         CONN.close()
