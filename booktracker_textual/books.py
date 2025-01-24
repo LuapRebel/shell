@@ -1,4 +1,6 @@
+from datetime import datetime
 from pydantic import ValidationError
+from statistics import mean
 from textual import events
 from textual import on
 from textual import work
@@ -10,6 +12,84 @@ from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, S
 
 from conn import CONN
 from db import Book
+
+
+def load_books() -> None:
+    cur = CONN.cursor()
+    data = cur.execute("SELECT * FROM books").fetchall()
+    return [Book(**d) for d in data]
+
+
+class BookStats:
+    """
+    Class to generate stats for books read, based on date_completed
+    """
+
+    def __init__(self, books: list[Book]):
+        self.books = books
+        self.ymd = [self.get_ymd(book) for book in books]
+
+    def get_ymd(self, book: Book) -> Book:
+        if book.status == "COMPLETED" and book.date_completed:
+            ymd = datetime.fromisoformat(book.date_completed)
+            return (
+                ymd.year,
+                ymd.month,
+                book.days_to_read,
+            )
+
+    def all_stats(self) -> dict:
+        years = {book[0] for book in self.ymd if book}
+        stats = [
+            [self.month_stats(year, month) for month in range(1, 13)] for year in years
+        ]
+        return [x for xs in stats for x in xs]
+
+    def month_stats(self, year: int, month: int) -> dict:
+        books_read = [
+            book for book in self.ymd if book and book[0] == year and book[1] == month
+        ]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        return {
+            "year": year,
+            "month": month,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
+
+    def year_stats(self, year: int, all: bool = False) -> dict:
+        books_read = [book for book in self.ymd if book and book[0] == year]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        if all:
+            return [self.month_stats(year, month) for month in range(1, 13)]
+        return {
+            "year": year,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
+
+
+class BookStatsScreen(Screen):
+    """Screen to display stats about books read"""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield RichLog(id="stats-log")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        books = load_books()
+        stats = BookStats(books)
+        rich_log = self.query_one("#stats-log")
+        rich_log.write(stats.all_stats())
 
 
 class BookEditWidget(Widget):
@@ -218,6 +298,7 @@ class BookScreen(Screen):
         ("a", "app.push_screen('add')", "Add"),
         ("e", "app.push_screen('edit')", "Edit"),
         ("d", "app.push_screen('delete')", "Delete"),
+        ("s", "app.push_screen('book_stats')", "Stats"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -226,18 +307,21 @@ class BookScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.load_books()
-
-    def _on_screen_resume(self) -> None:
-        self.load_books()
-
-    def load_books(self) -> None:
+        books = load_books()
+        rows = [book.model_dump().values() for book in books]
         table = self.query_one("#books-table")
         table.clear(columns=True)
-        cur = CONN.cursor()
-        data = cur.execute("SELECT * FROM books").fetchall()
-        books = [Book(**d).model_dump().values() for d in data]
         columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
         table.add_columns(*columns)
-        table.add_rows(books)
+        table.add_rows(rows)
+        table.zebra_stripes = True
+
+    def _on_screen_resume(self) -> None:
+        books = load_books()
+        rows = [book.model_dump().values() for book in books]
+        table = self.query_one("#books-table")
+        table.clear(columns=True)
+        columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
+        table.add_columns(*columns)
+        table.add_rows(rows)
         table.zebra_stripes = True

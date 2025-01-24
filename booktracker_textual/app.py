@@ -11,6 +11,7 @@ from books import (
     BookEditConfirmationScreen,
     BookFilterScreen,
     BookScreen,
+    BookStatsScreen,
 )
 
 
@@ -34,6 +35,7 @@ class BookTracker(App):
     SCREENS = {
         "add": BookAddScreen,
         "books": BookScreen,
+        "book_stats": BookStatsScreen,
         "delete": BookDeleteScreen,
         "delete_confirmation": BookDeleteConfirmationScreen,
         "edit": BookEditScreen,
