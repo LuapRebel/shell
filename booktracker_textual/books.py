@@ -78,6 +78,8 @@ class BookStats:
 class BookStatsScreen(Screen):
     """Screen to display stats about books read"""
 
+    BINDINGS = [("b", "push_books", "Books")]
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield RichLog(id="stats-log")
@@ -88,6 +90,9 @@ class BookStatsScreen(Screen):
         stats = BookStats(books)
         rich_log = self.query_one("#stats-log")
         rich_log.write(stats.all_stats())
+
+    def action_push_books(self) -> None:
+        self.app.push_screen(BookScreen())
 
 
 class BookEditWidget(Widget):
@@ -105,7 +110,7 @@ class BookEditWidget(Widget):
 class BookDeleteScreen(ModalScreen):
     """Screen to delete a Book given an ID"""
 
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    BINDINGS = [("b", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         with Container(id="book-delete-screen"):
@@ -117,15 +122,17 @@ class BookDeleteScreen(ModalScreen):
     def delete_book_pressed(self) -> None:
 
         def check_delete(delete: bool | None) -> None:
+            id = self.query_one("#id-delete")
             if delete:
-                id = self.query_one("#id-delete")
-                if id:
-                    cur = CONN.cursor()
-                    cur.execute("DELETE FROM books WHERE id=?", (id.value,))
-                    CONN.commit()
+                cur = CONN.cursor()
+                cur.execute("DELETE FROM books WHERE id=?", (id.value,))
+                CONN.commit()
             id.clear()
 
-        self.app.push_screen("delete_confirmation", check_delete)
+        self.app.push_screen(BookDeleteConfirmationScreen(), check_delete)
+
+    def action_push_books(self) -> None:
+        self.app.push_screen(BookScreen())
 
 
 class BookDeleteConfirmationScreen(ModalScreen[bool]):
@@ -145,12 +152,13 @@ class BookDeleteConfirmationScreen(ModalScreen[bool]):
             self.dismiss(True)
         else:
             self.dismiss(False)
+        self.app.push_screen(BookScreen())
 
 
 class BookAddScreen(ModalScreen):
     """Modal screen to provide inputs to create a new Book"""
 
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    BINDINGS = [("b", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
@@ -175,6 +183,9 @@ class BookAddScreen(ModalScreen):
         except ValidationError as e:
             self.notify(str(e))
 
+    def action_push_books(self) -> None:
+        self.app.push_screen(BookScreen())
+
 
 class BookEditConfirmationScreen(ModalScreen[str | None]):
     """Modal screen to confirm ID of book to be edited"""
@@ -197,7 +208,7 @@ class BookEditConfirmationScreen(ModalScreen[str | None]):
 class BookEditScreen(Screen):
     """Modal Screen to provide inputs to edit an existing book"""
 
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    BINDINGS = [("b", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
@@ -216,7 +227,7 @@ class BookEditScreen(Screen):
                 key = i.id.replace("-", "_")
                 i.value = book[key]
         else:
-            self.app.push_screen("books")
+            self.app.push_screen(BookScreen())
 
     def clear_inputs(self) -> None:
         inputs = self.query(Input)
@@ -249,13 +260,16 @@ class BookEditScreen(Screen):
             self.clear_inputs()
         except ValidationError as e:
             self.notify(str(e))
-        self.app.push_screen("books")
+        self.app.push_screen(BookScreen())
+
+    def action_push_books(self) -> None:
+        self.app.push_screen(BookScreen())
 
 
 class BookFilterScreen(Screen):
     """Widget to filter books by field and search term"""
 
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    BINDINGS = [("b", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -287,16 +301,19 @@ class BookFilterScreen(Screen):
         rich_log = self.query_one("#filter-log")
         rich_log.clear()
 
+    def action_push_books(self) -> None:
+        self.app.push_screen(BookScreen())
+
 
 class BookScreen(Screen):
     """Widget to manage book collection."""
 
     BINDINGS = [
-        ("f", "app.push_screen('filter')", "Filter"),
-        ("a", "app.push_screen('add')", "Add"),
-        ("e", "app.push_screen('edit')", "Edit"),
-        ("d", "app.push_screen('delete')", "Delete"),
-        ("s", "app.push_screen('book_stats')", "Stats"),
+        ("f", "push_filter", "Filter"),
+        ("a", "push_add", "Add"),
+        ("e", "push_edit", "Edit"),
+        ("d", "push_delete", "Delete"),
+        ("s", "push_stats", "Stats"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -323,3 +340,18 @@ class BookScreen(Screen):
         table.add_columns(*columns)
         table.add_rows(rows)
         table.zebra_stripes = True
+
+    def action_push_filter(self) -> None:
+        self.app.push_screen(BookFilterScreen())
+
+    def action_push_add(self) -> None:
+        self.app.push_screen(BookAddScreen())
+
+    def action_push_edit(self) -> None:
+        self.app.push_screen(BookEditScreen())
+
+    def action_push_delete(self) -> None:
+        self.app.push_screen(BookDeleteScreen())
+
+    def action_push_stats(self) -> None:
+        self.app.push_screen(BookStatsScreen())
