@@ -1,7 +1,8 @@
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+import re
 import sqlite3
 from statistics import mean
 
@@ -44,8 +45,8 @@ class Book:
     title: str = ""
     author: str = ""
     status: Status = "TBR"
-    date_started: date | None = None
-    date_completed: date | None = None
+    date_started: str | None = None
+    date_completed: str | None = None
     days_to_read: int | None = None
 
     def __post_init__(self):
@@ -57,6 +58,15 @@ class Book:
             self.days_to_read = (dc - ds).days + 1  # inclusive
         else:
             self.days_to_read = None
+
+
+def validate_dates(ctx, param, value):
+    if value == "":
+        return value
+    elif re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        return value
+    else:
+        raise click.BadParameter("Dates must be formatted as 'YYYY-MM-DD'.")
 
 
 def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
@@ -148,19 +158,21 @@ def cli() -> None:
 @click.option(
     "-d",
     "--date-started",
-    type=click.DateTime(formats=["%Y-%m-%d"]),
-    default=None,
+    type=str,
+    callback=validate_dates,
+    default="",
     help="YYYY-MM-DD",
 )
 @click.option(
     "-c",
     "--date-completed",
-    type=click.DateTime(formats=["%Y-%m-%d"]),
-    default=None,
+    type=str,
+    callback=validate_dates,
+    default="",
     help="YYYY-MM-DD",
 )
 def add(
-    title: str, author: str, status: Status, date_started: date, date_completed: date
+    title: str, author: str, status: Status, date_started: str, date_completed: str
 ):
     book = Book(
         title=title,
@@ -211,7 +223,7 @@ def edit(id: str) -> None:
         book = books[0]
         update_values = []
         update_sql = "SET "
-        for k, v in book.items():
+        for k, v in asdict(book).items():
             data = input(f"Edit {k} ({v}): ")
             if data:
                 update_sql += f"{k} = ?, "
