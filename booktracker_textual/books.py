@@ -1,9 +1,7 @@
 from datetime import datetime
 from pydantic import ValidationError
 from statistics import mean
-from textual import events
-from textual import on
-from textual import work
+from textual import events, on, work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen, Screen
@@ -16,7 +14,7 @@ from db import Book
 
 def load_books() -> None:
     cur = CONN.cursor()
-    data = cur.execute("SELECT * FROM books").fetchall()
+    data = cur.execute("SELECT * FROM books ORDER BY id DESC").fetchall()
     return [Book(**d) for d in data]
 
 

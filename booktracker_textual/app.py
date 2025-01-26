@@ -1,6 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.screen import Screen
-from textual.widgets import Footer, Header, Markdown
+from textual.widgets import Footer, Header
 
 from conn import CONN
 from books import (
