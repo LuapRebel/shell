@@ -28,7 +28,7 @@ class Book(BaseModel, extra="allow"):
                 return value
             else:
                 raise ValidationError("dates must be formatted as 'YYYY-MM-DD'.")
-        return value
+        return ""
 
     @model_validator(mode="after")
     def validate_date_completed(self) -> Self:
