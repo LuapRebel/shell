@@ -1,6 +1,9 @@
+from datetime import datetime
+import re
 from typing import Optional
 from typing_extensions import Annotated
 
+from pydantic import ValidationError
 from rich import print
 from rich.console import Console
 from rich.table import Table
@@ -30,6 +33,20 @@ def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
         return [Book(**book) for book in books]
 
 
+def status_callback(value: str):
+    if value not in ["TBR", "IN_PROGRESS", "COMPLETED"]:
+        raise typer.BadParameter(
+            "status must be one of 'TBR', 'IN_PROGRESS', or 'COMPLETED'"
+        )
+    return value
+
+
+def date_callback(value: str):
+    if not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        raise typer.BadParameter("date columns must be formatted 'YYYY-MM-DD'")
+    return value
+
+
 @app.command()
 def read(
     field: Annotated[
@@ -52,8 +69,44 @@ def read(
 
 
 @app.command()
-def add():
-    print("Adding a book...")
+def add(
+    title: Annotated[str, typer.Argument()],
+    author: Annotated[str, typer.Argument()],
+    status: Annotated[
+        str,
+        typer.Option(
+            "-s",
+            "--status",
+            callback=status_callback,
+            help="TBR, IN_PROGRESS, COMPLETED",
+        ),
+    ] = "TBR",
+    date_started: Annotated[
+        str,
+        typer.Option("-d", "--date-started", callback=date_callback, help="YYYY-MM-DD"),
+    ] = "",
+    date_completed: Annotated[
+        str,
+        typer.Option(
+            "-c", "--date-completed", callback=date_callback, help="YYYY-MM-DD"
+        ),
+    ] = "",
+) -> None:
+    try:
+        book = Book(
+            title=title,
+            author=author,
+            status=status,
+            date_started=date_started,
+            date_completed=date_completed,
+        )
+    except ValidationError as e:
+        print(e)
+    cur = CONN.cursor()
+    sql = "INSERT INTO books(title, author, status, date_started, date_completed) VALUES (?, ?, ?, ?, ?)"
+    binding = tuple(book.model_dump().values())[1:-1]
+    cur.execute(sql, binding)
+    CONN.commit()
 
 
 if __name__ == "__main__":

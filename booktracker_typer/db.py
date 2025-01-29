@@ -27,7 +27,7 @@ class Book(BaseModel, extra="allow"):
             if re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
                 return value
             else:
-                raise ValidationError("dates must be formatted as 'YYYY-MM-DD'.")
+                raise ValueError("dates must be formatted as 'YYYY-MM-DD'.")
         return ""
 
     @model_validator(mode="after")
@@ -38,7 +38,7 @@ class Book(BaseModel, extra="allow"):
             ):
                 return self
             else:
-                raise ValidationError("date_completed must be after date_started.")
+                raise ValueError("date_completed must be after date_started.")
         return self
 
     @computed_field
