@@ -104,7 +104,7 @@ def add(
         print(e)
     cur = CONN.cursor()
     sql = "INSERT INTO books(title, author, status, date_started, date_completed) VALUES (?, ?, ?, ?, ?)"
-    binding = tuple(book.model_dump().values())[1:-1]
+    binding = (title, author, status, date_started, date_completed)
     cur.execute(sql, binding)
     CONN.commit()
 
