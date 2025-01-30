@@ -6,7 +6,16 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Static
+from textual.widgets import (
+    Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Label,
+    Rule,
+    Static,
+)
 
 from conn import CONN
 from db import Book
@@ -36,14 +45,23 @@ class BookStats:
                 book.days_to_read,
             )
 
-    def all_stats(self) -> dict:
+    def flatten(self, l: list) -> list:
+        out = []
+        for item in l:
+            if isinstance(item, list):
+                out.extend(self.flatten(item))
+            else:
+                out.append(item)
+        return out
+
+    def complete_stats(self) -> list[dict]:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
-        return [x for xs in stats for x in xs]
+        return self.flatten(stats)
 
-    def month_stats(self, year: int, month: int) -> dict:
+    def month_stats(self, year: int, month: int) -> list[dict]:
         books_read = [
             book for book in self.ymd if book and book[0] == year and book[1] == month
         ]
@@ -52,27 +70,32 @@ class BookStats:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        return {
-            "year": year,
-            "month": month,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        return [
+            {
+                "year": year,
+                "month": month,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
 
-    def year_stats(self, year: int, all: bool = False) -> dict:
+    def year_stats(self, year: int, complete: bool = False) -> list[dict]:
         books_read = [book for book in self.ymd if book and book[0] == year]
         count = len(books_read)
         if count:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        if all:
-            return [self.month_stats(year, month) for month in range(1, 13)]
-        return {
-            "year": year,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        if complete:
+            month_stats = [self.month_stats(year, month) for month in range(1, 13)]
+            return self.flatten(month_stats)
+        return [
+            {
+                "year": year,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
 
 
 class BookStatsScreen(Screen):
@@ -82,14 +105,32 @@ class BookStatsScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield RichLog(id="stats-log")
+        yield Label("BookTracker Yearly Stats")
+        yield DataTable(id="stats-table-year")
+        yield Rule(line_style="heavy")
+        yield Label("BookTracker Complete Stats")
+        yield DataTable(id="stats-table-complete")
         yield Footer()
 
     def on_mount(self) -> None:
         books = load_books()
-        stats = BookStats(books)
-        rich_log = self.query_one("#stats-log")
-        rich_log.write(stats.all_stats())
+        complete_stats = BookStats(books).complete_stats()
+        years = {stat["year"] for stat in complete_stats}
+        year_table = self.query_one("#stats-table-year")
+        year_table_stats = [BookStats(books).year_stats(year)[0] for year in years]
+        year_table_columns = year_table_stats[0].keys()
+        year_table_rows = [stat.values() for stat in year_table_stats]
+        year_table.clear(columns=True)
+        year_table.add_columns(*year_table_columns)
+        year_table.add_rows(year_table_rows)
+        year_table.zebra_stripes = True
+        complete_columns = complete_stats[0].keys()
+        complete_rows = [stat.values() for stat in complete_stats]
+        complete_table = self.query_one("#stats-table-complete")
+        complete_table.clear(columns=True)
+        complete_table.add_columns(*complete_columns)
+        complete_table.add_rows(complete_rows)
+        complete_table.zebra_stripes = True
 
     def action_push_books(self) -> None:
         self.app.push_screen(BookScreen())
@@ -279,7 +320,7 @@ class BookFilterScreen(Screen):
             Button("Submit", id="filter-submit", classes="column"),
             id="filter-container",
         )
-        yield RichLog(id="filter-log")
+        yield DataTable(id="filter-table")
         yield Footer()
 
     @on(Button.Pressed, "#filter-submit")
@@ -291,15 +332,20 @@ class BookFilterScreen(Screen):
         cur = CONN.cursor()
         data = cur.execute(read_sql, binding).fetchall()
         books = [Book(**d) for d in data]
-        rich_log = self.query_one("#filter-log")
-        rich_log.clear()
-        rich_log.write(books)
+        table = self.query_one("#filter-table")
+        table.clear(columns=True)
+        rows = [book.model_dump().values() for book in books]
+        columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
+        table.add_columns(*columns)
+        table.add_rows(rows)
+        table.zebra_stripes = True
+
         for i in self.query(Input):
             i.clear()
 
     def _on_screen_resume(self) -> None:
-        rich_log = self.query_one("#filter-log")
-        rich_log.clear()
+        table = self.query_one("#filter-table")
+        table.clear(columns=True)
 
     def action_push_books(self) -> None:
         self.app.push_screen(BookScreen())
