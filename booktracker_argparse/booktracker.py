@@ -76,14 +76,14 @@ class BookStats:
                 out.append(item)
         return out
 
-    def complete_stats(self) -> dict:
+    def complete_stats(self) -> list[dict]:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
         return self.flatten(stats)
 
-    def month_stats(self, year: int, month: int) -> dict:
+    def month_stats(self, year: int, month: int) -> list[dict]:
         books_read = [
             book for book in self.ymd if book and book[0] == year and book[1] == month
         ]
@@ -119,8 +119,7 @@ class BookStats:
             }
         ]
 
-    @classmethod
-    def print_rich_table(cls, stats: list[dict[str, int | float | None]]):
+    def print_rich_table(self, stats: list[dict[str, int | float | None]]):
         table = Table(title="BookTracker Statistics")
         columns = stats[0].keys()
         for column in columns:
@@ -275,19 +274,18 @@ elif args.command == "stats":
     books = read_books()
     if books:
         stats = BookStats(books)
-    # table = Table(title="BookTracker Statistics")
     if not any([args.complete, args.year, args.month]):
         print("Choose --complete, --year, and/or --month to print stats.")
     if args.year and not args.month:
         if args.complete:
-            BookStats.print_rich_table(
+            stats.print_rich_table(
                 stats.year_stats(year=args.year, complete=args.complete)
             )
         else:
-            BookStats.print_rich_table(stats.year_stats(year=args.year))
+            stats.print_rich_table(stats.year_stats(year=args.year))
     if args.year and args.month:
-        BookStats.print_rich_table(stats.month_stats(year=args.year, month=args.month))
+        stats.print_rich_table(stats.month_stats(year=args.year, month=args.month))
     if args.month and not args.year:
-        print("You must provide a year  and a month.")
+        print("You must provide a year and a month.")
     if args.complete and not args.year:
-        BookStats.print_rich_table(stats.complete_stats())
+        stats.print_rich_table(stats.complete_stats())
