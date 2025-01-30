@@ -1,4 +1,6 @@
+from datetime import datetime
 import re
+from statistics import mean
 from typing import Optional
 from typing_extensions import Annotated
 
@@ -13,6 +15,63 @@ from db import Book
 
 app = typer.Typer()
 console = Console()
+
+
+class BookStats:
+    """
+    Class to generate stats for books read, based on date_completed
+    """
+
+    def __init__(self, books: list[Book]):
+        self.books = books
+        self.ymd = [self.get_ymd(book) for book in books]
+
+    def get_ymd(self, book: Book) -> Book:
+        if book.status == "COMPLETED" and book.date_completed:
+            ymd = datetime.fromisoformat(book.date_completed)
+            return (
+                ymd.year,
+                ymd.month,
+                book.days_to_read,
+            )
+
+    def complete_stats(self) -> dict:
+        years = {book[0] for book in self.ymd if book}
+        stats = [
+            [self.month_stats(year, month) for month in range(1, 13)] for year in years
+        ]
+        return [x for xs in stats for x in xs]
+
+    def month_stats(self, year: int, month: int) -> dict:
+        books_read = [
+            book for book in self.ymd if book and book[0] == year and book[1] == month
+        ]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        return {
+            "year": year,
+            "month": month,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
+
+    def year_stats(self, year: int, complete: bool = False) -> dict:
+        books_read = [book for book in self.ymd if book and book[0] == year]
+        count = len(books_read)
+        if count:
+            avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
+        else:
+            avg_days_to_read = None
+        if complete:
+            return [self.month_stats(year, month) for month in range(1, 13)]
+        return {
+            "year": year,
+            "count": count,
+            "avg_days_to_read": avg_days_to_read,
+        }
 
 
 def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
@@ -72,7 +131,7 @@ def add(
     title: Annotated[str, typer.Argument()],
     author: Annotated[str, typer.Argument()],
     status: Annotated[
-        str,
+        Optional[str],
         typer.Option(
             "-s",
             "--status",
@@ -81,11 +140,11 @@ def add(
         ),
     ] = "TBR",
     date_started: Annotated[
-        str,
+        Optional[str],
         typer.Option("-d", "--date-started", callback=date_callback, help="YYYY-MM-DD"),
     ] = "",
     date_completed: Annotated[
-        str,
+        Optional[str],
         typer.Option(
             "-c", "--date-completed", callback=date_callback, help="YYYY-MM-DD"
         ),
@@ -152,6 +211,34 @@ def edit(id: Annotated[int, typer.Argument(help="ID of book to edit")]) -> None:
             CONN.commit()
     else:
         print(f"There is no book with {id=}")
+
+
+@app.command()
+def stats(
+    year: Annotated[int, typer.Option(help="Limit stats to a particular year")] = None,
+    month: Annotated[
+        int, typer.Option(help="Limit stats to a particular month.")
+    ] = None,
+    complete: Annotated[
+        Optional[bool], typer.Option(help="Print complete stats by month")
+    ] = False,
+) -> None:
+    books = get_books()
+    if books:
+        stats = BookStats(books)
+    if not any([complete, year, month]):
+        print("Choose --complete, --year, and/or --month to print stats.")
+    if year and not month:
+        if complete:
+            print(stats.year_stats(year=year, complete=complete))
+        else:
+            print(stats.year_stats(year=year))
+    if year and month:
+        print(stats.month_stats(year=year, month=month))
+    if month and not year:
+        print("You must provide a year and a month.")
+    if complete and not year:
+        print(stats.complete_stats())
 
 
 if __name__ == "__main__":
