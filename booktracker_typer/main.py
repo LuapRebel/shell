@@ -129,6 +129,31 @@ def delete(id: Annotated[int, typer.Argument(help="ID to delete")]) -> None:
         print(f"There is no book with {id=}.")
 
 
+@app.command()
+def edit(id: Annotated[int, typer.Argument(help="ID of book to edit")]) -> None:
+    cur = CONN.cursor()
+    book = cur.execute("SELECT * FROM books WHERE id=?", (id,)).fetchone()
+    if book:
+        update_sql = "SET "
+        update_fields = []
+        update_values = []
+        for k, v in book.items():
+            data = input(f"Edit {k} ({v}): ")
+            if data:
+                update_sql += f"{k} = ?, "
+                update_values.append(data)
+        full_sql = f"""
+        UPDATE books
+        {update_sql[0:-2]}
+        WHERE id = {id}
+        """
+        if update_values:
+            cur.execute(full_sql, update_values)
+            CONN.commit()
+    else:
+        print(f"There is no book with {id=}")
+
+
 if __name__ == "__main__":
     app()
     CONN.close()
