@@ -8,6 +8,11 @@ from statistics import mean
 
 import click
 from rich import print
+from rich.console import Console
+from rich.table import Table
+
+
+console = Console()
 
 
 def dict_factory(cursor, row):
@@ -104,12 +109,21 @@ class BookStats:
                 book.days_to_read,
             )
 
-    def all_stats(self) -> dict:
+    def flatten(self, l: list) -> list:
+        out = []
+        for item in l:
+            if isinstance(item, list):
+                out.extend(self.flatten(item))
+            else:
+                out.append(item)
+        return out
+
+    def complete_stats(self) -> dict:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
-        return [x for xs in stats for x in xs]
+        return self.flatten(stats)
 
     def month_stats(self, year: int, month: int) -> dict:
         books_read = [
@@ -120,27 +134,42 @@ class BookStats:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        return {
-            "year": year,
-            "month": month,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        return [
+            {
+                "year": year,
+                "month": month,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
 
-    def year_stats(self, year: int, all: bool = False) -> dict:
+    def year_stats(self, year: int, complete: bool = False) -> list[dict]:
         books_read = [book for book in self.ymd if book and book[0] == year]
         count = len(books_read)
         if count:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        if all:
-            return [self.month_stats(year, month) for month in range(1, 13)]
-        return {
-            "year": year,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        if complete:
+            month_stats = [self.month_stats(year, month) for month in range(1, 13)]
+            return self.flatten(month_stats)
+        return [
+            {
+                "year": year,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
+
+    def print_rich_table(self, stats: list[dict[str, int | float | None]]):
+        table = Table(title="BookTracker Statistics")
+        columns = stats[0].keys()
+        for column in columns:
+            table.add_column(column)
+        for row in stats:
+            values = list(map(str, row.values()))
+            table.add_row(*values)
+        console.print(table)
 
 
 @click.group()
@@ -263,11 +292,11 @@ def delete(id: str) -> None:
 
 # STATS
 @click.command()
-@click.option("--all", is_flag=True)
+@click.option("--complete", is_flag=True)
 @click.option("-y", "--year", type=int)
 @click.option("-m", "--month", type=click.IntRange(1, 12))
 def stats(
-    all: bool | None = False, year: int | None = None, month: int | None = None
+    complete: bool | None = False, year: int | None = None, month: int | None = None
 ) -> None:
     books = get_books()
     if books:
@@ -275,18 +304,19 @@ def stats(
     else:
         print("There are no books to run stats on.")
         click.Context.close()
-    if all:
-        if year:
-            print(stats.year_stats(year, all))
+    if not any([complete, year, month]):
+        print("Choose --complete, --year, and/or --month to print stats.")
+    if year and not month:
+        if complete:
+            stats.print_rich_table(stats.year_stats(year=year, complete=complete))
         else:
-            print(stats.all_stats())
-    else:
-        if year and month:
-            print(stats.month_stats(year, month))
-        elif not month:
-            print(stats.year_stats(year))
+            stats.print_rich_table(stats.year_stats(year=year))
+    if year and month:
+        stats.print_rich_table(stats.month_stats(year=year, month=month))
     if month and not year:
-        print("ERROR: You must provide a year in addition to month.")
+        print("You must provide a year and a month.")
+    if complete and not year:
+        stats.print_rich_table(stats.complete_stats())
 
 
 if __name__ == "__main__":
