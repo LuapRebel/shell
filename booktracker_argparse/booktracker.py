@@ -7,9 +7,13 @@ from pathlib import Path
 from statistics import mean
 
 from rich import print
+from rich.console import Console
+from rich.table import Table
 
 DIR = Path(__file__).parent.resolve()
 DB_PATH = DIR / "books.csv"
+
+console = Console()
 
 
 class Status(StrEnum):
@@ -63,12 +67,13 @@ class BookStats:
                 book.days_to_read,
             )
 
-    def all_stats(self) -> dict:
+    def complete_stats(self) -> dict:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
-        return [x for xs in stats for x in xs]
+        flat_stats = [x for xs in stats for x in xs]
+        return [x for xs in flat_stats for x in xs]
 
     def month_stats(self, year: int, month: int) -> dict:
         books_read = [
@@ -79,27 +84,43 @@ class BookStats:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        return {
-            "year": year,
-            "month": month,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        return [
+            {
+                "year": year,
+                "month": month,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
 
-    def year_stats(self, year: int, all: bool = False) -> dict:
+    def year_stats(self, year: int, complete: bool = False) -> list[dict]:
         books_read = [book for book in self.ymd if book and book[0] == year]
         count = len(books_read)
         if count:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        if all:
-            return [self.month_stats(year, month) for month in range(1, 13)]
-        return {
-            "year": year,
-            "count": count,
-            "avg_days_to_read": avg_days_to_read,
-        }
+        if complete:
+            month_stats = [self.month_stats(year, month) for month in range(1, 13)]
+            return [x for xs in month_stats for x in xs]
+        return [
+            {
+                "year": year,
+                "count": count,
+                "avg_days_to_read": avg_days_to_read,
+            }
+        ]
+
+    @classmethod
+    def print_rich_table(self, stats: list[dict[str, int | float | None]]):
+        table = Table(title="BookTracker Statistics")
+        columns = stats[0].keys()
+        for column in columns:
+            table.add_column(column)
+        for row in stats:
+            values = list(map(str, row.values()))
+            table.add_row(*values)
+        console.print(table)
 
 
 def write_book(book: Book) -> None:
@@ -220,7 +241,7 @@ delete_parser.add_argument("id", type=str)
 stats_parser = subparsers.add_parser(
     "stats", help="Generate statistics for books completed"
 )
-stats_parser.add_argument("--all", action=argparse.BooleanOptionalAction)
+stats_parser.add_argument("--complete", action=argparse.BooleanOptionalAction)
 stats_parser.add_argument("-y", "--year", type=int, default=None)
 stats_parser.add_argument("-m", "--month", type=int, default=None)
 
@@ -244,16 +265,21 @@ elif args.command == "delete":
         delete_book(args.id)
 elif args.command == "stats":
     books = read_books()
-    stats = BookStats(books)
-    if args.all:
-        if args.year:
-            print(stats.year_stats(args.year, args.all))
+    if books:
+        stats = BookStats(books)
+    # table = Table(title="BookTracker Statistics")
+    if not any([args.complete, args.year, args.month]):
+        print("Choose --complete, --year, and/or --month to print stats.")
+    if args.year and not args.month:
+        if args.complete:
+            BookStats.print_rich_table(
+                stats.year_stats(year=args.year, complete=args.complete)
+            )
         else:
-            print(stats.all_stats())
-    else:
-        if args.year and args.month:
-            print(stats.month_stats(args.year, args.month))
-        elif not args.month:
-            print(stats.year_stats(args.year))
+            BookStats.print_rich_table(stats.year_stats(year=args.year))
+    if args.year and args.month:
+        BookStats.print_rich_table(stats.month_stats(year=args.year, month=args.month))
     if args.month and not args.year:
-        print("ERROR: You must provide a year in addition to month.")
+        print("You must provide a year  and a month.")
+    if args.complete and not args.year:
+        BookStats.print_rich_table(stats.complete_stats())
