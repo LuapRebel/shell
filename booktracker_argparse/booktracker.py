@@ -67,13 +67,21 @@ class BookStats:
                 book.days_to_read,
             )
 
+    def flatten(self, l: list) -> list:
+        out = []
+        for item in l:
+            if isinstance(item, list):
+                out.extend(self.flatten(item))
+            else:
+                out.append(item)
+        return out
+
     def complete_stats(self) -> dict:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
-        flat_stats = [x for xs in stats for x in xs]
-        return [x for xs in flat_stats for x in xs]
+        return self.flatten(stats)
 
     def month_stats(self, year: int, month: int) -> dict:
         books_read = [
@@ -102,7 +110,7 @@ class BookStats:
             avg_days_to_read = None
         if complete:
             month_stats = [self.month_stats(year, month) for month in range(1, 13)]
-            return [x for xs in month_stats for x in xs]
+            return self.flatten(month_stats)
         return [
             {
                 "year": year,
@@ -112,7 +120,7 @@ class BookStats:
         ]
 
     @classmethod
-    def print_rich_table(self, stats: list[dict[str, int | float | None]]):
+    def print_rich_table(cls, stats: list[dict[str, int | float | None]]):
         table = Table(title="BookTracker Statistics")
         columns = stats[0].keys()
         for column in columns:
