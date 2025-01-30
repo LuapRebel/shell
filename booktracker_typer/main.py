@@ -1,4 +1,3 @@
-from datetime import datetime
 import re
 from typing import Optional
 from typing_extensions import Annotated
@@ -107,6 +106,27 @@ def add(
     binding = (title, author, status, date_started, date_completed)
     cur.execute(sql, binding)
     CONN.commit()
+
+
+@app.command()
+def delete(id: Annotated[int, typer.Argument(help="ID to delete")]) -> None:
+    cur = CONN.cursor()
+    book = cur.execute("SELECT * FROM books WHERE id=?", (id,)).fetchone()
+    if book:
+        book_info = f"'{book['title']}' by {book['author']}"
+        delete_book = (
+            input(f"Are you sure you want to delete {book_info} (y/n): ")
+            .lower()
+            .strip()
+            == "y"
+        )
+        if delete_book:
+            print(f"Deleting {book_info}...")
+            cur.execute("DELETE FROM books WHERE id=?", (id,))
+            CONN.commit()
+            print(f"{book_info} has been deleted.")
+    else:
+        print(f"There is no book with {id=}.")
 
 
 if __name__ == "__main__":
