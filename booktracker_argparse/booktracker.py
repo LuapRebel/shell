@@ -1,6 +1,6 @@
 import argparse
 import csv
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -147,7 +147,7 @@ def write_book(book: Book) -> None:
     print(f"Added {book.title} by {book.author} to book_db.csv")
 
 
-def read_books(path: Path = Path(DB_PATH)) -> list[dict]:
+def read_books(path: Path = Path(DB_PATH)) -> list[Book]:
     if path.is_file():
         with open(path, "r") as f:
             reader = csv.DictReader(f)
@@ -155,14 +155,14 @@ def read_books(path: Path = Path(DB_PATH)) -> list[dict]:
     return []
 
 
-def filter_books(field: str | None = None, value: str | None = None) -> list[dict]:
+def filter_books(field: str | None = None, value: str | None = None) -> list[Book]:
     books = read_books()
     if field and value:
-        return [b for b in books if value in str(getattr(b, field))]
+        return [b for b in books if value.lower() in str(getattr(b, field).lower())]
     return books
 
 
-def get_book_by_id(id: str) -> dict:
+def get_book_by_id(id: str) -> Book:
     book = filter_books(field="id", value=id)
     if book:
         return book[0]
@@ -261,9 +261,20 @@ if args.command == "add":
     write_book(new_book)
 elif args.command == "read":
     if args.field and args.value:
-        print(filter_books(args.field, args.value))
+        books = filter_books(args.field, args.value)
     else:
-        print(read_books())
+        books = read_books()
+    if books:
+        rows = [map(str, asdict(book).values()) for book in books]
+        columns = asdict(books[0]).keys()
+        table = Table(title="BookTracker")
+        for column in columns:
+            table.add_column(column)
+        for row in rows:
+            table.add_row(*row)
+        console.print(table)
+    else:
+        print("There are no books available.")
 elif args.command == "edit":
     if args.id:
         edit_book(args.id)
