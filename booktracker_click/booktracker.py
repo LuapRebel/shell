@@ -256,10 +256,11 @@ def read(field: str | None = None, value: str | None = None) -> list[Book]:
 def edit(id: str) -> None:
     books = get_books(field="id", value=id)
     if books:
-        book = books[0]
+        book = asdict(books[0])
+        del book["days_to_read"]
         update_values = []
         update_sql = "SET "
-        for k, v in asdict(book).items():
+        for k, v in book.items():
             data = input(f"Edit {k} ({v}): ")
             if data:
                 update_sql += f"{k} = ?, "

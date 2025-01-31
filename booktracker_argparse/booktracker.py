@@ -179,6 +179,7 @@ def write_books(books: list[dict]) -> None:
 
 def edit_book(id: str) -> None:
     book = asdict(get_book_by_id(id))
+    del book["days_to_read"]
     if book:
         for k, v in book.items():
             data = input(f"Edit {k} ({v}): ")
