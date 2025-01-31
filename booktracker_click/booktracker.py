@@ -240,7 +240,14 @@ def read(field: str | None = None, value: str | None = None) -> list[Book]:
         if not books:
             print("There are no books.")
     if books:
-        print(books)
+        rows = [map(str, asdict(book).values()) for book in books]
+        columns = asdict(books[0]).keys()
+        table = Table(title="BookTracker")
+        for column in columns:
+            table.add_column(column)
+        for row in rows:
+            table.add_row(*row)
+        console.print(table)
 
 
 # EDIT BOOK
