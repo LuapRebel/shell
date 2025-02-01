@@ -7,7 +7,7 @@ import sqlite3
 from statistics import mean
 
 import click
-from rich import print
+from rich import box, print
 from rich.console import Console
 from rich.table import Table
 
@@ -162,10 +162,11 @@ class BookStats:
         ]
 
     def print_rich_table(self, stats: list[dict[str, int | float | None]]):
-        table = Table(title="BookTracker Statistics")
         columns = stats[0].keys()
-        for column in columns:
-            table.add_column(column)
+        colors = ["bright_green", "bright_blue", "bright_red", "cyan3"]
+        table = Table(title="BookTracker Statistics", box=box.ROUNDED)
+        for column, color in zip(columns, colors):
+            table.add_column(column, style=color, justify="full", min_width=8)
         for row in stats:
             values = list(map(str, row.values()))
             table.add_row(*values)
@@ -240,11 +241,20 @@ def read(field: str | None = None, value: str | None = None) -> list[Book]:
         if not books:
             print("There are no books.")
     if books:
-        rows = [map(str, asdict(book).values()) for book in books]
         columns = asdict(books[0]).keys()
-        table = Table(title="BookTracker")
-        for column in columns:
-            table.add_column(column)
+        colors = [
+            "white",
+            "bright_green",
+            "bright_blue",
+            "bright_red",
+            "bright_magenta",
+            "cyan3",
+            "orange1",
+        ]
+        rows = [map(str, asdict(book).values()) for book in books]
+        table = Table(title="BookTracker", box=box.ROUNDED)
+        for column, color in zip(columns, colors):
+            table.add_column(column, style=color)
         for row in rows:
             table.add_row(*row)
         console.print(table)

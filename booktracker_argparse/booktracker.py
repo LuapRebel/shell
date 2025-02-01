@@ -6,7 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 from statistics import mean
 
-from rich import print
+from rich import box, print
 from rich.console import Console
 from rich.table import Table
 
@@ -24,12 +24,12 @@ class Status(StrEnum):
 
 @dataclass
 class Book:
+    id: int | None = None
     title: str = ""
     author: str = ""
     status: Status = "TBR"
     date_started: date | None = None
     date_completed: date | None = None
-    id: int | None = None
     days_to_read: int | None = None
 
     def __post_init__(self):
@@ -120,10 +120,11 @@ class BookStats:
         ]
 
     def print_rich_table(self, stats: list[dict[str, int | float | None]]):
-        table = Table(title="BookTracker Statistics")
         columns = stats[0].keys()
-        for column in columns:
-            table.add_column(column)
+        colors = ["bright_green", "bright_blue", "bright_red", "cyan3"]
+        table = Table(title="BookTracker Statistics", box=box.ROUNDED)
+        for column, color in zip(columns, colors):
+            table.add_column(column, style=color, justify="full", min_width=8)
         for row in stats:
             values = list(map(str, row.values()))
             table.add_row(*values)
@@ -266,11 +267,20 @@ elif args.command == "read":
     else:
         books = read_books()
     if books:
-        rows = [map(str, asdict(book).values()) for book in books]
         columns = asdict(books[0]).keys()
-        table = Table(title="BookTracker")
-        for column in columns:
-            table.add_column(column)
+        colors = [
+            "white",
+            "bright_green",
+            "bright_blue",
+            "bright_red",
+            "bright_magenta",
+            "cyan3",
+            "orange1",
+        ]
+        rows = [map(str, asdict(book).values()) for book in books]
+        table = Table(title="BookTracker", box=box.ROUNDED)
+        for column, color in zip(columns, colors):
+            table.add_column(column, style=color)
         for row in rows:
             table.add_row(*row)
         console.print(table)
