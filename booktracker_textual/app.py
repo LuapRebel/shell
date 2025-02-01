@@ -26,16 +26,13 @@ class BookTracker(App):
         "edit_confirmation": BookEditConfirmationScreen,
         "filter": BookFilterScreen,
     }
-    # BINDINGS = [
-    #     ("b", "push_screen('books')", "Books"),
-    # ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
 
     def on_mount(self) -> None:
-        self.theme = "gruvbox"
+        self.theme = "dracula"
         self.push_screen(BookScreen())
 
     def _on_screen_resume(self) -> None:

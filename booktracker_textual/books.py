@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from statistics import mean
 from textual import events, on, work
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Center, Container, Horizontal
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import (
@@ -105,11 +105,13 @@ class BookStatsScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Label("BookTracker Yearly Stats")
-        yield DataTable(id="stats-table-year")
+        with Center(id="yearly-stats"):
+            yield Label("BookTracker Yearly Stats", id="stats-table-year-label")
+            yield DataTable(id="stats-table-year")
         yield Rule(line_style="heavy")
-        yield Label("BookTracker Complete Stats")
-        yield DataTable(id="stats-table-complete")
+        with Center(id="complete-stats"):
+            yield Label("BookTracker Complete Stats", id="stats-table-complete-label")
+            yield DataTable(id="stats-table-complete")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -202,9 +204,10 @@ class BookAddScreen(ModalScreen):
     BINDINGS = [("b", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
-        yield BookEditWidget()
-        yield Button("Submit", id="add")
-        yield Footer()
+        with Container(id="add-screen"):
+            yield BookEditWidget()
+            yield Button("Submit", id="add")
+            yield Footer()
 
     @on(Button.Pressed, "#add")
     def book_submit_pressed(self):

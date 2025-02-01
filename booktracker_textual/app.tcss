@@ -15,11 +15,6 @@ BookInputScreen {
     height: auto;
 }
 
-#filter-log {
-    min-height: 90%;
-    height: auto;
-}
-
 #book-edit-delete-widget {
     dock: bottom;
 }
@@ -29,4 +24,39 @@ BookInputScreen {
     margin: 1;
 }
 
+BookStatsScreen {
+    align: center top;
+}
+
+#yearly-stats {
+    content-align: center middle;
+    padding: 1;
+}
+
+#stats-table-year-label {
+    width: 50%;
+    text-align: center;
+}
+
+#stats-table-year {
+    width: 50%;
+    align: center middle;
+    border: solid white;
+}
+
+#complete-stats {
+    content-align: center middle;
+    padding: 1;
+}
+
+#stats-table-complete-label {
+    width: 50%;
+    text-align: center;
+}
+
+#stats-table-complete {
+    width: 50%;
+    align: center middle;
+    border: solid white;
+}
 
