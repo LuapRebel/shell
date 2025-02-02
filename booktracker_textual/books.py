@@ -269,7 +269,7 @@ class BookEditScreen(Screen):
             inputs = self.query(Input)
             for i in inputs:
                 key = i.id.replace("-", "_")
-                i.value = book[key]
+                i.value = book.get(key, '')
         else:
             self.app.push_screen(BookScreen())
 
