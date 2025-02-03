@@ -139,7 +139,7 @@ class BookStatsScreen(Screen):
 
 
 class BookEditWidget(Widget):
-    """Widget to edit book information"""
+    """Widget to edit book information. Used in both Add and Edit scenarios."""
 
     def compose(self) -> ComposeResult:
         with Container(id="book-edit-widget"):
@@ -233,45 +233,32 @@ class BookAddScreen(ModalScreen):
         self.app.push_screen(BookScreen())
 
 
-class BookEditConfirmationScreen(ModalScreen[str | None]):
-    """Modal screen to confirm ID of book to be edited"""
-
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
-
-    def compose(self) -> ComposeResult:
-        yield Input(placeholder="ID", id="id-edit")
-        yield Button("Edit", id="edit-submit")
-
-    @on(Button.Pressed, "#edit-submit")
-    def edit_book_pressed(self) -> None:
-        book_id = self.query_one("#id-edit")
-        if book_id:
-            self.dismiss(book_id.value)
-        else:
-            self.dismiss(None)
-
-
 class BookEditScreen(Screen):
     """Modal Screen to provide inputs to edit an existing book"""
 
-    BINDINGS = [("b", "push_books", "Books")]
+    BINDINGS = [
+        ("escape", "push_books", "Books"),
+    ]
+
+    def __init__(self, cell_value: str) -> None:
+        super().__init__()
+        self.cell_value = cell_value
 
     def compose(self) -> ComposeResult:
         yield BookEditWidget()
         yield Button("Submit", id="edit-submit")
         yield Footer()
 
-    @work
-    async def on_mount(self) -> None:
-        book_id = await self.app.push_screen_wait(BookEditConfirmationScreen())
-        if book_id:
-            self.book_id = book_id
+    def on_mount(self) -> None:
+        if self.cell_value:
             cur = CONN.cursor()
-            book = cur.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
+            book = cur.execute(
+                "SELECT * FROM books WHERE id=?", (self.cell_value,)
+            ).fetchone()
             inputs = self.query(Input)
             for i in inputs:
                 key = i.id.replace("-", "_")
-                i.value = book.get(key, '')
+                i.value = book.get(key, "")
         else:
             self.app.push_screen(BookScreen())
 
@@ -332,27 +319,46 @@ class BookFilterScreen(Screen):
     def filter_submit_pressed(self) -> None:
         field = self.query_one("#filter-field").value
         value = self.query_one("#filter-value").value
-        read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
-        binding = (f"%{value}%",)
-        cur = CONN.cursor()
-        data = cur.execute(read_sql, binding).fetchall()
-        books = [Book(**d) for d in data]
-        table = self.query_one("#filter-table")
-        table.clear(columns=True)
-        rows = [book.model_dump().values() for book in books]
-        columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
-        table.add_columns(*columns)
-        table.add_rows(rows)
-        table.zebra_stripes = True
+        if field and value:
+            read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
+            binding = (f"%{value}%",)
+            cur = CONN.cursor()
+            data = cur.execute(read_sql, binding).fetchall()
+            books = [Book(**d) for d in data]
+            table = self.query_one("#filter-table")
+            table.clear(columns=True)
+            rows = [book.model_dump().values() for book in books]
+            columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
+            table.add_columns(*columns)
+            table.add_rows(rows)
+            table.zebra_stripes = True
+            self.focus_next("#filter-table")
+            self.clear_inputs()
 
-        for i in self.query(Input):
+    def clear_inputs(self) -> None:
+        inputs = self.query(Input)
+        for i in inputs:
             i.clear()
 
     def _on_screen_resume(self) -> None:
         table = self.query_one("#filter-table")
         table.clear(columns=True)
 
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
+        self.cell_value = event.value or ""
+        self.cell_coordinate = event.coordinate
+
+    def action_push_edit(self) -> None:
+        try:
+            int(self.cell_value)
+        except ValueError:
+            pass
+        else:
+            if self.cell_coordinate.column == 0:
+                self.app.push_screen(BookEditScreen(self.cell_value))
+
     def action_push_books(self) -> None:
+        self.clear_inputs()
         self.app.push_screen(BookScreen())
 
 
@@ -392,6 +398,10 @@ class BookScreen(Screen):
         table.add_rows(rows)
         table.zebra_stripes = True
 
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
+        self.cell_value = event.value or ""
+        self.cell_coordinate = event.coordinate
+
     def action_push_filter(self) -> None:
         self.app.push_screen(BookFilterScreen())
 
@@ -399,7 +409,13 @@ class BookScreen(Screen):
         self.app.push_screen(BookAddScreen())
 
     def action_push_edit(self) -> None:
-        self.app.push_screen(BookEditScreen())
+        try:
+            int(self.cell_value)
+        except ValueError:
+            pass
+        else:
+            if self.cell_coordinate.column == 0:
+                self.app.push_screen(BookEditScreen(self.cell_value))
 
     def action_push_delete(self) -> None:
         self.app.push_screen(BookDeleteScreen())
