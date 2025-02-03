@@ -163,16 +163,21 @@ class BookDeleteScreen(ModalScreen):
 
     @on(Button.Pressed, "#delete-submit")
     def delete_book_pressed(self) -> None:
-
         def check_delete(delete: bool | None) -> None:
-            id = self.query_one("#id-delete")
             if delete:
-                cur = CONN.cursor()
                 cur.execute("DELETE FROM books WHERE id=?", (id.value,))
                 CONN.commit()
             id.clear()
 
-        self.app.push_screen(BookDeleteConfirmationScreen(), check_delete)
+        id = self.query_one("#id-delete")
+        cur = CONN.cursor()
+        book = cur.execute("SELECT * FROM books WHERE id=?", (id.value,)).fetchone()
+        if not book:
+            self.notify(f"There is no book with ID = {id.value}")
+            id.clear()
+            self.app.push_screen(BookDeleteScreen())
+        else:
+            self.app.push_screen(BookDeleteConfirmationScreen(), check_delete)
 
     def action_push_books(self) -> None:
         self.app.push_screen(BookScreen())
