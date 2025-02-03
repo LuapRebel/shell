@@ -7,7 +7,6 @@ from books import (
     BookDeleteScreen,
     BookDeleteConfirmationScreen,
     BookEditScreen,
-    BookEditConfirmationScreen,
     BookFilterScreen,
     BookScreen,
     BookStatsScreen,
@@ -23,7 +22,6 @@ class BookTracker(App):
         "delete": BookDeleteScreen,
         "delete_confirmation": BookDeleteConfirmationScreen,
         "edit": BookEditScreen,
-        "edit_confirmation": BookEditConfirmationScreen,
         "filter": BookFilterScreen,
     }
 
