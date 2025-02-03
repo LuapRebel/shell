@@ -1,7 +1,7 @@
 from datetime import datetime
 from pydantic import ValidationError
 from statistics import mean
-from textual import events, on, work
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Center, Container, Horizontal
 from textual.screen import ModalScreen, Screen
@@ -101,7 +101,7 @@ class BookStats:
 class BookStatsScreen(Screen):
     """Screen to display stats about books read"""
 
-    BINDINGS = [("b", "push_books", "Books")]
+    BINDINGS = [("escape", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -153,7 +153,7 @@ class BookEditWidget(Widget):
 class BookDeleteScreen(ModalScreen):
     """Screen to delete a Book given an ID"""
 
-    BINDINGS = [("b", "push_books", "Books")]
+    BINDINGS = [("escape", "push_books", "Books")]
 
     def compose(self) -> ComposeResult:
         with Container(id="book-delete-screen"):
@@ -201,7 +201,9 @@ class BookDeleteConfirmationScreen(ModalScreen[bool]):
 class BookAddScreen(ModalScreen):
     """Modal screen to provide inputs to create a new Book"""
 
-    BINDINGS = [("b", "push_books", "Books")]
+    BINDINGS = [
+        ("escape", "push_books", "Books"),
+    ]
 
     def compose(self) -> ComposeResult:
         with Container(id="add-screen"):
@@ -278,10 +280,6 @@ class BookEditScreen(Screen):
         for i in inputs:
             i.clear()
 
-    def on_key(self, event: events.Key) -> None:
-        if event.key == "escape":
-            self.clear_inputs()
-
     @on(Button.Pressed, "#edit-submit")
     def edit_submit_pressed(self):
         inputs = self.query(Input)
@@ -307,13 +305,17 @@ class BookEditScreen(Screen):
         self.app.push_screen(BookScreen())
 
     def action_push_books(self) -> None:
+        self.clear_inputs()
         self.app.push_screen(BookScreen())
 
 
 class BookFilterScreen(Screen):
     """Widget to filter books by field and search term"""
 
-    BINDINGS = [("b", "push_books", "Books")]
+    BINDINGS = [
+        ("escape", "push_books", "Books"),
+        ("e", "push_edit", "Edit"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header()
