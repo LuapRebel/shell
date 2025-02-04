@@ -1,9 +1,10 @@
 import argparse
 import csv
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+import re
 from statistics import mean
 
 from rich import box, print
@@ -28,8 +29,8 @@ class Book:
     title: str = ""
     author: str = ""
     status: Status = "TBR"
-    date_started: date | None = None
-    date_completed: date | None = None
+    date_started: str | None = None
+    date_completed: str | None = None
     days_to_read: int | None = None
 
     def __post_init__(self):
@@ -67,16 +68,16 @@ class BookStats:
                 book.days_to_read,
             )
 
-    def flatten(self, l: list) -> list:
+    def flatten(self, lst: list) -> list:
         out = []
-        for item in l:
+        for item in lst:
             if isinstance(item, list):
                 out.extend(self.flatten(item))
             else:
                 out.append(item)
         return out
 
-    def complete_stats(self) -> list[dict]:
+    def detailed_stats(self) -> list[dict]:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
@@ -101,14 +102,14 @@ class BookStats:
             }
         ]
 
-    def year_stats(self, year: int, complete: bool = False) -> list[dict]:
+    def year_stats(self, year: int, detailed: bool = False) -> list[dict]:
         books_read = [book for book in self.ymd if book and book[0] == year]
         count = len(books_read)
         if count:
             avg_days_to_read = round(mean([book[2] for book in books_read]), 2)
         else:
             avg_days_to_read = None
-        if complete:
+        if detailed:
             month_stats = [self.month_stats(year, month) for month in range(1, 13)]
             return self.flatten(month_stats)
         return [
@@ -179,9 +180,10 @@ def write_books(books: list[dict]) -> None:
 
 
 def edit_book(id: str) -> None:
-    book = asdict(get_book_by_id(id))
-    del book["days_to_read"]
+    book = get_book_by_id(id)
     if book:
+        book = asdict(book)
+        del book["days_to_read"]
         for k, v in book.items():
             data = input(f"Edit {k} ({v}): ")
             if data:
@@ -196,9 +198,15 @@ def edit_book(id: str) -> None:
 def delete_book(id: str) -> None:
     book = get_book_by_id(id)
     if book:
-        books = [asdict(b) for b in read_books() if b.id != id]
-        write_books(books)
-        print(f"Deleted {book.title} by {book.author}")
+        query = input(
+            f"Are you sure you want to delete {book.title} by {book.author}? (y/n): "
+        )
+        if query.strip().lower() == "y":
+            books = [asdict(b) for b in read_books() if b.id != id]
+            write_books(books)
+            title = f"[bright_green]{book.title}[/bright_green]"
+            author = f"[bright_blue]{book.author}[/bright_blue]"
+            print(f"Deleting {title} by {author}")
 
 
 parser = argparse.ArgumentParser(
@@ -206,10 +214,18 @@ parser = argparse.ArgumentParser(
 )
 subparsers = parser.add_subparsers(dest="command")
 
+
 # ADD BOOK
+class DateAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}", values):
+            raise argparse.ArgumentError(self, "Dates must be formatted 'YYYY-MM-DD'")
+        setattr(namespace, self.dest, values)
+
+
 add_parser = subparsers.add_parser("add", help="Add a new book")
 add_parser.add_argument("title", type=str, help="Title")
-add_parser.add_argument("author", type=str, help="Author")
+add_parser.add_argument("author", type=str, help="Author (Lastname, Firstname)")
 add_parser.add_argument(
     "-s",
     "--status",
@@ -221,44 +237,75 @@ add_parser.add_argument(
 add_parser.add_argument(
     "-d",
     "--date-started",
-    type=date.fromisoformat,
+    type=str,
+    action=DateAction,
     default=None,
-    help="DDDD-MM-YY",
+    help="Use format: 'YYYY-MM-DD'",
 )
 add_parser.add_argument(
     "-c",
     "--date-completed",
-    type=date.fromisoformat,
+    type=str,
+    action=DateAction,
     default=None,
-    help="DDDD-MM-YY",
+    help="Use format: 'YYYY-MM-DD'",
 )
 
 # READ BOOKS
 read_parser = subparsers.add_parser("read", help="View existing books")
-read_parser.add_argument("-f", "--field", type=str)
-read_parser.add_argument("-v", "--value", type=str)
+read_parser.add_argument(
+    "-f",
+    "--field",
+    type=str,
+    help="Field to search",
+    choices=["id", "title", "author", "status", "date_started", "date_completed"],
+)
+read_parser.add_argument("-v", "--value", type=str, help="Search term")
 
 # EDIT BOOKS
 edit_parser = subparsers.add_parser("edit", help="Edit a book using its ID")
-edit_parser.add_argument("id", type=str)
+edit_parser.add_argument("id", type=str, help="id of book to edit")
 
 # DELETE BOOK
 delete_parser = subparsers.add_parser("delete", help="Delete a book using its ID")
-delete_parser.add_argument("id", type=str)
+delete_parser.add_argument("id", type=str, help="id of book to delete")
+
 
 # STATS
+class YearAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if not values > 0:
+            raise argparse.ArgumentError(self, "Year must be an integer > 0")
+        setattr(namespace, self.dest, values)
+
+
+class MonthAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values not in range(1, 13):
+            raise argparse.ArgumentError(
+                self, "Month must be an integer between 1 and 12."
+            )
+        setattr(namespace, self.dest, values)
+
+
 stats_parser = subparsers.add_parser(
     "stats", help="Generate statistics for books completed"
 )
-stats_parser.add_argument("--complete", action=argparse.BooleanOptionalAction)
-stats_parser.add_argument("-y", "--year", type=int, default=None)
-stats_parser.add_argument("-m", "--month", type=int, default=None)
+stats_parser.add_argument(
+    "--detailed",
+    action=argparse.BooleanOptionalAction,
+    help="Print detailed stats",
+)
+stats_parser.add_argument("-y", "--year", type=int, action=YearAction, default=None)
+stats_parser.add_argument(
+    "-m", "--month", type=int, action=MonthAction, default=None, help="1 - 12"
+)
 
 args = parser.parse_args()
 
 if args.command == "add":
     new_book = Book(
-        args.title, args.author, args.status, args.date_started, args.date_completed
+        args.title, args.author, args.status, args.date_started, args.date_detailedd
     )
     write_book(new_book)
 elif args.command == "read":
@@ -285,7 +332,7 @@ elif args.command == "read":
             table.add_row(*row)
         console.print(table)
     else:
-        print("There are no books available.")
+        print("There are no books available with that search criteria.")
 elif args.command == "edit":
     if args.id:
         edit_book(args.id)
@@ -296,12 +343,12 @@ elif args.command == "stats":
     books = read_books()
     if books:
         stats = BookStats(books)
-    if not any([args.complete, args.year, args.month]):
-        print("Choose --complete, --year, and/or --month to print stats.")
+    if not any([args.detailed, args.year, args.month]):
+        print("Choose --detailed, --year, and/or --month to print stats.")
     if args.year and not args.month:
-        if args.complete:
+        if args.detailed:
             stats.print_rich_table(
-                stats.year_stats(year=args.year, complete=args.complete)
+                stats.year_stats(year=args.year, detailed=args.detailed)
             )
         else:
             stats.print_rich_table(stats.year_stats(year=args.year))
@@ -309,5 +356,5 @@ elif args.command == "stats":
         stats.print_rich_table(stats.month_stats(year=args.year, month=args.month))
     if args.month and not args.year:
         print("You must provide a year and a month.")
-    if args.complete and not args.year:
-        stats.print_rich_table(stats.complete_stats())
+    if args.detailed and not args.year:
+        stats.print_rich_table(stats.detailed_stats())
