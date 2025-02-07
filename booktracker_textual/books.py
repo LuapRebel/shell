@@ -286,7 +286,7 @@ class BookEditScreen(Screen):
             full_sql = f"""
             UPDATE books
             {update_sql[0:-2]}
-            WHERE id = {self.book_id}
+            WHERE id = {self.cell_value}
             """
             cursor = CONN.cursor()
             cursor.execute(full_sql, update_values)
