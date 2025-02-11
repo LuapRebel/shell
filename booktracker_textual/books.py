@@ -155,11 +155,26 @@ class BookDeleteScreen(ModalScreen):
 
     BINDINGS = [("escape", "push_books", "Books")]
 
+    def __init__(self, cell_value: str) -> None:
+        super().__init__()
+        self.cell_value = cell_value
+
     def compose(self) -> ComposeResult:
         with Container(id="book-delete-screen"):
             yield Input(placeholder="ID", id="id-delete")
             yield Button("Delete", id="delete-submit")
             yield Footer()
+
+    def on_mount(self) -> None:
+        if self.cell_value:
+            cur = CONN.cursor()
+            book = cur.execute(
+                "SELECT * FROM books WHERE id=?", (self.cell_value,)
+            ).fetchone()
+            input = self.query_one("#id-delete", Input)
+            input.value = str(book.get("id", ""))
+        else:
+            self.app.push_screen(BookScreen())
 
     @on(Button.Pressed, "#delete-submit")
     def delete_book_pressed(self) -> None:
@@ -423,7 +438,13 @@ class BookScreen(Screen):
                 self.app.push_screen(BookEditScreen(self.cell_value))
 
     def action_push_delete(self) -> None:
-        self.app.push_screen(BookDeleteScreen())
+        try:
+            int(self.cell_value)
+        except ValueError:
+            pass
+        else:
+            if self.cell_coordinate.column == 0:
+                self.app.push_screen(BookDeleteScreen(self.cell_value))
 
     def action_push_stats(self) -> None:
         self.app.push_screen(BookStatsScreen())
