@@ -21,7 +21,7 @@ from conn import CONN
 from db import Book
 
 
-def load_books() -> None:
+def load_books() -> list[Book]:
     cur = CONN.cursor()
     data = cur.execute("SELECT * FROM books ORDER BY id DESC").fetchall()
     return [Book(**d) for d in data]
@@ -118,7 +118,7 @@ class BookStatsScreen(Screen):
         books = load_books()
         complete_stats = BookStats(books).complete_stats()
         years = {stat["year"] for stat in complete_stats}
-        year_table = self.query_one("#stats-table-year")
+        year_table = self.query_one("#stats-table-year", DataTable)
         year_table_stats = [BookStats(books).year_stats(year)[0] for year in years]
         year_table_columns = year_table_stats[0].keys()
         year_table_rows = [stat.values() for stat in year_table_stats]
@@ -128,7 +128,7 @@ class BookStatsScreen(Screen):
         year_table.zebra_stripes = True
         complete_columns = complete_stats[0].keys()
         complete_rows = [stat.values() for stat in complete_stats]
-        complete_table = self.query_one("#stats-table-complete")
+        complete_table = self.query_one("#stats-table-complete", DataTable)
         complete_table.clear(columns=True)
         complete_table.add_columns(*complete_columns)
         complete_table.add_rows(complete_rows)
@@ -184,13 +184,14 @@ class BookDeleteScreen(ModalScreen):
                 CONN.commit()
             id.clear()
 
-        id = self.query_one("#id-delete")
+        id = self.query_one("#id-delete", Input)
+        value = id.value
         cur = CONN.cursor()
-        book = cur.execute("SELECT * FROM books WHERE id=?", (id.value,)).fetchone()
+        book = cur.execute("SELECT * FROM books WHERE id=?", (value,)).fetchone()
         if not book:
-            self.notify(f"There is no book with ID = {id.value}")
+            self.notify(f"There is no book with ID = {value}")
             id.clear()
-            self.app.push_screen(BookDeleteScreen())
+            self.app.push_screen(BookDeleteScreen(value))
         else:
             self.app.push_screen(BookDeleteConfirmationScreen(), check_delete)
 
@@ -277,8 +278,9 @@ class BookEditScreen(Screen):
             ).fetchone()
             inputs = self.query(Input)
             for i in inputs:
-                key = i.id.replace("-", "_")
-                i.value = book.get(key, "")
+                if i.id:
+                    key = i.id.replace("-", "_")
+                    i.value = book.get(key, "")
         else:
             self.app.push_screen(BookScreen())
 
@@ -337,15 +339,15 @@ class BookFilterScreen(Screen):
 
     @on(Button.Pressed, "#filter-submit")
     def filter_submit_pressed(self) -> None:
-        field = self.query_one("#filter-field").value
-        value = self.query_one("#filter-value").value
+        field = self.query_one("#filter-field", Input).value
+        value = self.query_one("#filter-value", Input).value
         if field and value:
             read_sql = f"SELECT * FROM books WHERE {field} LIKE ?"
             binding = (f"%{value}%",)
             cur = CONN.cursor()
             data = cur.execute(read_sql, binding).fetchall()
             books = [Book(**d) for d in data]
-            table = self.query_one("#filter-table")
+            table = self.query_one("#filter-table", DataTable)
             table.clear(columns=True)
             rows = [book.model_dump().values() for book in books]
             columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
@@ -361,11 +363,11 @@ class BookFilterScreen(Screen):
             i.clear()
 
     def _on_screen_resume(self) -> None:
-        table = self.query_one("#filter-table")
+        table = self.query_one("#filter-table", DataTable)
         table.clear(columns=True)
 
     def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
-        self.cell_value = event.value or ""
+        self.cell_value = str(event.value) or ""
         self.cell_coordinate = event.coordinate
 
     def action_push_edit(self) -> None:
@@ -401,7 +403,7 @@ class BookScreen(Screen):
     def on_mount(self) -> None:
         books = load_books()
         rows = [book.model_dump().values() for book in books]
-        table = self.query_one("#books-table")
+        table = self.query_one("#books-table", DataTable)
         table.clear(columns=True)
         columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
         table.add_columns(*columns)
@@ -411,7 +413,7 @@ class BookScreen(Screen):
     def _on_screen_resume(self) -> None:
         books = load_books()
         rows = [book.model_dump().values() for book in books]
-        table = self.query_one("#books-table")
+        table = self.query_one("#books-table", DataTable)
         table.clear(columns=True)
         columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
         table.add_columns(*columns)
@@ -419,7 +421,7 @@ class BookScreen(Screen):
         table.zebra_stripes = True
 
     def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
-        self.cell_value = event.value or ""
+        self.cell_value = str(event.value) or ""
         self.cell_coordinate = event.coordinate
 
     def action_push_filter(self) -> None:
