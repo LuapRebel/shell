@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import sqlite3
 from statistics import mean
+from typing import Optional
 
 import click
 from rich import box, print
@@ -49,7 +50,7 @@ class Book:
     id: int | None = None
     title: str = ""
     author: str = ""
-    status: Status = "TBR"
+    status: Status = Status.TBR
     date_started: str | None = None
     date_completed: str | None = None
     days_to_read: int | None = None
@@ -74,7 +75,9 @@ def validate_dates(ctx, param, value):
         raise click.BadParameter("Dates must be formatted as 'YYYY-MM-DD'.")
 
 
-def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
+def get_books(
+    field: str | None = None, value: str | None = None
+) -> Optional[list[Book]]:
     if field and value:
         if field == "id":
             read_sql = f"SELECT * FROM books WHERE id=?"
@@ -89,6 +92,7 @@ def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
         books = cursor.execute("SELECT * FROM books").fetchall()
     if books:
         return [Book(**book) for book in books]
+    return None
 
 
 class BookStats:
@@ -100,14 +104,15 @@ class BookStats:
         self.books = books
         self.ymd = [self.get_ymd(book) for book in books]
 
-    def get_ymd(self, book: Book) -> Book:
-        if book.status == "COMPLETED" and book.date_completed:
+    def get_ymd(self, book: Book) -> Optional[tuple[int, int, int]]:
+        if book.days_to_read and book.date_completed:
             ymd = datetime.fromisoformat(book.date_completed)
             return (
                 ymd.year,
                 ymd.month,
                 book.days_to_read,
             )
+        return None
 
     def flatten(self, l: list) -> list:
         out = []
@@ -118,14 +123,14 @@ class BookStats:
                 out.append(item)
         return out
 
-    def complete_stats(self) -> dict:
+    def complete_stats(self) -> list[dict]:
         years = {book[0] for book in self.ymd if book}
         stats = [
             [self.month_stats(year, month) for month in range(1, 13)] for year in years
         ]
         return self.flatten(stats)
 
-    def month_stats(self, year: int, month: int) -> dict:
+    def month_stats(self, year: int, month: int) -> list[dict]:
         books_read = [
             book for book in self.ymd if book and book[0] == year and book[1] == month
         ]
@@ -227,11 +232,11 @@ def add(
 @click.option(
     "-f",
     "--field",
-    type=click.Choice(Book.__annotations__),
+    type=click.Choice(list(Book.__annotations__)),
     help="Field to search within",
 )
 @click.option("-v", "--value", help="Value to search for")
-def read(field: str | None = None, value: str | None = None) -> list[Book]:
+def read(field: str | None = None, value: str | None = None) -> None:
     if field and value:
         books = get_books(field=field, value=value)
         if not books:
@@ -313,15 +318,19 @@ def delete(id: str) -> None:
 @click.option("--complete", is_flag=True)
 @click.option("-y", "--year", type=int)
 @click.option("-m", "--month", type=click.IntRange(1, 12))
+@click.pass_context
 def stats(
-    complete: bool | None = False, year: int | None = None, month: int | None = None
+    ctx: click.Context,
+    complete: bool | None = False,
+    year: int | None = None,
+    month: int | None = None,
 ) -> None:
     books = get_books()
     if books:
         stats = BookStats(books)
     else:
         print("There are no books to run stats on.")
-        click.Context.close()
+        ctx.close()
     if not any([complete, year, month]):
         print("Choose --complete, --year, and/or --month to print stats.")
     if year and not month:
