@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Literal, Optional
+from typing import Optional
 from typing_extensions import Self
 
 from pydantic import (
@@ -8,7 +8,6 @@ from pydantic import (
     computed_field,
     field_validator,
     model_validator,
-    ValidationError,
 )
 
 
@@ -16,7 +15,7 @@ class Book(BaseModel, extra="allow"):
     id: Optional[int] = None
     title: str = ""
     author: str = ""
-    status: Literal["TBR", "IN_PROGRESS", "COMPLETED"] = "TBR"
+    status: str = "TBR"
     date_started: str = ""
     date_completed: str = ""
 
@@ -41,10 +40,11 @@ class Book(BaseModel, extra="allow"):
                 raise ValueError("date_completed must be after date_started.")
         return self
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def days_to_read(self) -> int | None:
         if self.date_started and self.date_completed:
             ds = datetime.strptime(self.date_started, "%Y-%m-%d")
             dc = datetime.strptime(self.date_completed, "%Y-%m-%d")
             return (dc - ds).days + 1
+        return None

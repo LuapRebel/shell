@@ -26,14 +26,15 @@ class BookStats:
         self.books = books
         self.ymd = [self.get_ymd(book) for book in books]
 
-    def get_ymd(self, book: Book) -> Book:
-        if book.status == "COMPLETED" and book.date_completed:
+    def get_ymd(self, book: Book) -> Optional[tuple[int, int, int]]:
+        if book.days_to_read and book.date_completed:
             ymd = datetime.fromisoformat(book.date_completed)
             return (
                 ymd.year,
                 ymd.month,
                 book.days_to_read,
             )
+        return None
 
     def flatten(self, l: list) -> list:
         out = []
@@ -99,7 +100,9 @@ class BookStats:
         console.print(table)
 
 
-def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
+def get_books(
+    field: str | None = None, value: str | None = None
+) -> Optional[list[Book]]:
     if field and value:
         if field == "id":
             read_sql = f"SELECT * FROM books WHERE id=?"
@@ -114,6 +117,7 @@ def get_books(field: str | None = None, value: str | None = None) -> list[Book]:
         books = cursor.execute("SELECT * FROM books").fetchall()
     if books:
         return [Book(**book) for book in books]
+    return None
 
 
 def status_callback(value: str):
@@ -139,25 +143,26 @@ def read(
     value: Annotated[
         Optional[str], typer.Option("-v", "--value", help="Search term")
     ] = None,
-) -> list[Book]:
+) -> None:
     books = get_books(field, value)
-    columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
-    colors = [
-        "white",
-        "bright_green",
-        "bright_blue",
-        "bright_red",
-        "bright_magenta",
-        "cyan3",
-        "orange1",
-    ]
-    rows = [map(str, book.model_dump().values()) for book in books]
-    table = Table(title="BookTracker", box=box.ROUNDED)
-    for column, color in zip(columns, colors):
-        table.add_column(column, style=color)
-    for row in rows:
-        table.add_row(*row)
-    console.print(table)
+    if books:
+        columns = [*Book.model_fields.keys(), *Book.model_computed_fields.keys()]
+        colors = [
+            "white",
+            "bright_green",
+            "bright_blue",
+            "bright_red",
+            "bright_magenta",
+            "cyan3",
+            "orange1",
+        ]
+        rows = [map(str, book.model_dump().values()) for book in books]
+        table = Table(title="BookTracker", box=box.ROUNDED)
+        for column, color in zip(columns, colors):
+            table.add_column(column, style=color)
+        for row in rows:
+            table.add_row(*row)
+        console.print(table)
 
 
 @app.command()
@@ -165,7 +170,7 @@ def add(
     title: Annotated[str, typer.Argument()],
     author: Annotated[str, typer.Argument()],
     status: Annotated[
-        Optional[str],
+        str,
         typer.Option(
             "-s",
             "--status",
@@ -174,11 +179,11 @@ def add(
         ),
     ] = "TBR",
     date_started: Annotated[
-        Optional[str],
+        str,
         typer.Option("-d", "--date-started", callback=date_callback, help="YYYY-MM-DD"),
     ] = "",
     date_completed: Annotated[
-        Optional[str],
+        str,
         typer.Option(
             "-c", "--date-completed", callback=date_callback, help="YYYY-MM-DD"
         ),
@@ -248,9 +253,12 @@ def edit(id: Annotated[int, typer.Argument(help="ID of book to edit")]) -> None:
 
 @app.command()
 def stats(
-    year: Annotated[int, typer.Option(help="Limit stats to a particular year")] = None,
+    year: Annotated[
+        Optional[int], typer.Option(help="Limit stats to a particular year")
+    ] = None,
     month: Annotated[
-        int, typer.Option(min=1, max=12, help="Limit stats to a particular month.")
+        Optional[int],
+        typer.Option(min=1, max=12, help="Limit stats to a particular month."),
     ] = None,
     complete: Annotated[
         Optional[bool], typer.Option(help="Print complete stats by month")
